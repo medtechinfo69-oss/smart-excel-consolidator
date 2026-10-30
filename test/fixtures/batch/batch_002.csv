@@ -1,0 +1,11 @@
+Adresse,E-mail,Patronyme,City,Cotisation,Fixe,Portable,Comments
+5 rue de la Paix,sophie75@example.fr,Martin,Lyon,45,0612345678,01 45 67 89 10,Client noté 4/5
+10 rue Victor Hugo,.lodie42@example.fr,Bernard,Nice,"1 250,00 €",06 12 34 56 78,0612345678,
+28 rue Victor Hugo,th.o55@example.fr,Roux,Rennes,"210,75",+33 6 12 34 56 78,01 45 67 89 10,Client noté 3/5
+11 rue Victor Hugo,th.o29@example.fr,Roux,Rennes,"99,99",,0033712345678,
+22 rue de la Paix,fran.ois22@example.fr,Petit,Nantes,"1 050,00",0033712345678,0612345678,Client noté 3/5
+36 rue des Lilas,a.cha76@example.fr,Robert,Lille,"210,75",,06 12 34 56 78,
+36 rue du Général de Gaulle,k.vin44@example.fr,Moreau,Rouen,"75,50",,0712345678,Client noté 2/5
+36 rue Victor Hugo,manon74@example.fr,Simon,Reims,45,06 12 34 56 78,0612345678,
+23 rue des Lilas,.lodie0@example.fr,Bernard,Nice,"1 050,00",+33 6 12 34 56 78,0612345678,Client noté 4/5,VALEUR NON CARTOGRAPHIÉE 2-8
+5 rue Victor Hugo,th.o14@example.fr,Roux,Rennes,120 €,01 45 67 89 10,0033712345678,Client noté 1/5

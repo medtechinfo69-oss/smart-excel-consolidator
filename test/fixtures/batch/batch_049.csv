@@ -1,0 +1,14 @@
+City,First Name,Rue,Observation,Email,CP,Fixe,Tel 1,Nom de famille,Montant cotisation,Caisse
+Paris,Jean,46 rue de la Paix,Client noté 2/5,jean73@example.fr,75001,0033712345678,0612345678,Dupont,120 €,Malakoff Humanis
+Rouen,Kévin,28 rue de la Paix,Client noté 4/5,k.vin59@example.fr,76000,06 12 34 56 78,01 45 67 89 10,Moreau,"1 250,00 €",MAIF
+Lyon,Sophie,21 rue des Lilas,Client noté 1/5,sophie6@example.fr,69002,0712345678,0612345678,Martin,"210,75",MGEN
+Lille,Aïcha,22 rue des Lilas,,a.cha2@example.fr,59000,,0033712345678,Robert,88.20,AG2R La Mondiale
+Rouen,Kévin,8 rue Victor Hugo,Client noté 4/5,k.vin42@example.fr,76000,+33 6 12 34 56 78,0712345678,Moreau,"99,99",MGEN
+Reims,Manon,8 rue du Général de Gaulle,,manon71@example.fr,51100,06 12 34 56 78,0612345678,Simon,"210,75",AG2R La Mondiale
+Bordeaux,Pierre-Yves,25 rue du Général de Gaulle,,pierre.yves25@example.fr,33000,,0033712345678,Richard,"99,99",AXA Santé
+Reims,Manon,19 rue Victor Hugo,,manon71@example.fr,51100,,+33 6 12 34 56 78,Simon,120 €,AXA Santé
+Nantes,François,6 rue Victor Hugo,,fran.ois49@example.fr,44000,,06 12 34 56 78,Petit,"1 250,00 €",Malakoff Humanis
+Rouen,Kévin,15 rue Victor Hugo,Client noté 4/5,k.vin15@example.fr,76000,01 45 67 89 10,+33 6 12 34 56 78,Moreau,"75,50",AXA Santé
+Paris,Jean,40 rue Victor Hugo,,jean38@example.fr,75001,0033712345678,06 12 34 56 78,Dupont,"1 250,00 €",MAIF
+Reims,Manon,24 rue des Lilas,Client noté 1/5,manon55@example.fr,51100,01 45 67 89 10,0712345678,Simon,88.20,MAIF
+Reims,Manon,4 rue des Lilas,Client noté 1/5,manon53@example.fr,51100,0033712345678,06 12 34 56 78,Simon,45,MAIF

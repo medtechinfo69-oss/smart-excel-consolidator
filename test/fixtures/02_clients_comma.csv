@@ -1,0 +1,5 @@
+Last Name,First Name,Mobile Number,Phone 2,Address,Postal Code,City,Email,Monthly Contribution,Insurer,Comments
+Smith,John,0612345678,0145678910,"10 Downing Street, Apt 3",75001,Paris,john.smith@example.com,75.50,April,"Quoted, with comma"
+Garcia,Maria,0712345678,,Calle Mayor 12,31000,Toulouse,maria.garcia@example.com,1200.00,SwissLife,"Line one
+Line two in same cell"
+Nguyen,Thi,0687654321,0987654321,3 rue Victor Hugo,69001,Lyon,thi.nguyen@example.fr,"59,90",MNH,

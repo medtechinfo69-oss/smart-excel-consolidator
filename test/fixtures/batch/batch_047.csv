@@ -1,0 +1,11 @@
+Observation;Zip;E-mail;Given Name;Caisse;Phone;Fixe;Cotisation;Adresse
+Client noté 2/5;31000;marie.claire16@example.fr;Marie-Claire;Groupama;+33 6 12 34 56 78;0612345678;"99,99";19 rue Victor Hugo
+;97400;lucas45@example.fr;Lucas;Groupama;0612345678;;"99,99";47 rue de la Paix
+;06000;.lodie31@example.fr;Élodie;AG2R La Mondiale;0033712345678;;"99,99";29 rue de la Paix
+;59000;a.cha57@example.fr;Aïcha;AG2R La Mondiale;0033712345678;0033712345678;"1 250,00 €";42 rue du Général de Gaulle
+Client noté 1/5;35000;th.o8@example.fr;Théo;MGEN;01 45 67 89 10;+33 6 12 34 56 78;"1 050,00";38 rue Victor Hugo
+;59000;a.cha50@example.fr;Aïcha;AXA Santé;0033712345678;;"99,99";7 rue de la Paix
+;59000;a.cha32@example.fr;Aïcha;MGEN;0612345678;;"75,50";34 rue Victor Hugo
+;75001;jean23@example.fr;Jean;Groupama;0612345678;0033712345678;"99,99";36 rue du Général de Gaulle
+Client noté 2/5;31000;marie.claire32@example.fr;Marie-Claire;MGEN;0033712345678;;"99,99";12 rue des Lilas
+;51100;manon17@example.fr;Manon;Groupama;06 12 34 56 78;0712345678;"1 050,00";15 rue de la Paix

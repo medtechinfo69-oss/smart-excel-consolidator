@@ -1,0 +1,14 @@
+Tel 1;Zip;Patronyme;Localité;Mail;Given Name;Téléphone fixe;Cotisation;Assureur;Voie;Remarques
+06 12 34 56 78;06000;Bernard;Nice;.lodie87@example.fr;Élodie;0612345678;"99,99";AG2R La Mondiale;43 rue Victor Hugo;Client noté 3/5
+01 45 67 89 10;33000;Richard;Bordeaux;pierre.yves43@example.fr;Pierre-Yves;0612345678;45;AG2R La Mondiale;8 rue Victor Hugo;Client noté 1/5
++33 6 12 34 56 78;51100;Simon;Reims;manon58@example.fr;Manon;;"210,75";MAIF;33 rue de la Paix;Client noté 4/5
+0712345678;76000;Moreau;Rouen;k.vin1@example.fr;Kévin;+33 6 12 34 56 78;88.20;Harmonie Mutuelle;50 rue des Lilas;Client noté 0/5
+0033712345678;51100;Simon;Reims;manon45@example.fr;Manon;0712345678;"75,50";MGEN;33 rue de la Paix;Client noté 1/5
++33 6 12 34 56 78;44000;Petit;Nantes;fran.ois56@example.fr;François;;"210,75";Groupama;25 rue Victor Hugo;
+01 45 67 89 10;06000;Bernard;Nice;.lodie31@example.fr;Élodie;+33 6 12 34 56 78;"1 250,00 €";Malakoff Humanis;31 rue Victor Hugo;Client noté 0/5
++33 6 12 34 56 78;06000;Bernard;Nice;.lodie53@example.fr;Élodie;0712345678;88.20;Groupama;34 rue Victor Hugo;
+0033712345678;59000;Robert;Lille;a.cha88@example.fr;Aïcha;;120 €;AXA Santé;9 rue Victor Hugo;Client noté 3/5
+0612345678;06000;Bernard;Nice;.lodie67@example.fr;Élodie;+33 6 12 34 56 78;"99,99";AXA Santé;6 rue des Lilas;
+0033712345678;35000;Roux;Rennes;th.o41@example.fr;Théo;01 45 67 89 10;"99,99";AXA Santé;50 rue de la Paix;
+06 12 34 56 78;51100;Simon;Reims;manon58@example.fr;Manon;;"1 250,00 €";Groupama;49 rue du Général de Gaulle;Client noté 2/5
+06 12 34 56 78;59000;Robert;Lille;a.cha85@example.fr;Aïcha;;88.20;MAIF;41 rue des Lilas;Client noté 1/5;VALEUR NON CARTOGRAPHIÉE 46-12

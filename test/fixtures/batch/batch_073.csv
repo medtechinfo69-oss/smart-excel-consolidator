@@ -1,0 +1,14 @@
+Portable;Surname;Cotisation mensuelle;Remarques;Téléphone fixe;City
+06 12 34 56 78;Bernard;"75,50";;0033712345678;Nice
+06 12 34 56 78;Petit;"99,99";Client noté 1/5;0612345678;Nantes
+0612345678;Simon;"99,99";;0612345678;Reims
+0612345678;Leroy;"75,50";;+33 6 12 34 56 78;Strasbourg
+0712345678;Martin;88.20;;0612345678;Lyon
+06 12 34 56 78;Richard;"210,75";Client noté 4/5;;Bordeaux;VALEUR NON CARTOGRAPHIÉE 73-5
+0612345678;Martin;"99,99";;+33 6 12 34 56 78;Lyon
+0612345678;Richard;120 €;Client noté 1/5;+33 6 12 34 56 78;Bordeaux
+0712345678;Roux;"99,99";Client noté 2/5;0712345678;Rennes
+01 45 67 89 10;Martin;"75,50";Client noté 4/5;;Lyon
+06 12 34 56 78;Leroy;45;Client noté 4/5;;Strasbourg
+0612345678;Simon;"75,50";Client noté 2/5;0033712345678;Reims
++33 6 12 34 56 78;Bernard;120 €;;01 45 67 89 10;Nice

@@ -1,0 +1,10 @@
+Commune;Observation;Adresse complète;Tel secondaire;Phone;Cotisation;Nom;Mutuelle;Courriel;Prénom;Zip
+Paris;;3 rue des Lilas;;01 45 67 89 10;120 €;Dupont;MGEN;jean49@example.fr;Jean;75001
+Rouen;;47 rue Victor Hugo;01 45 67 89 10;01 45 67 89 10;"1 050,00";Moreau;MGEN;k.vin11@example.fr;Kévin;76000
+Bordeaux;Client noté 3/5;49 rue du Général de Gaulle;;06 12 34 56 78;120 €;Richard;Malakoff Humanis;pierre.yves75@example.fr;Pierre-Yves;33000
+Paris;Client noté 4/5;7 rue de la Paix;;01 45 67 89 10;120 €;Dupont;Groupama;jean35@example.fr;Jean;75001
+Nantes;;41 rue de la Paix;0612345678;+33 6 12 34 56 78;120 €;Petit;MGEN;fran.ois36@example.fr;François;44000;VALEUR NON CARTOGRAPHIÉE 93-4
+Lille;Client noté 1/5;37 rue Victor Hugo;0033712345678;06 12 34 56 78;120 €;Robert;Groupama;a.cha87@example.fr;Aïcha;59000
+Reims;;8 rue Victor Hugo;;01 45 67 89 10;45;Simon;Malakoff Humanis;manon39@example.fr;Manon;51100
+Rouen;Client noté 3/5;28 rue Victor Hugo;;0612345678;"99,99";Moreau;Groupama;k.vin83@example.fr;Kévin;76000
+Rouen;;24 rue Victor Hugo;;+33 6 12 34 56 78;"210,75";Moreau;MGEN;k.vin85@example.fr;Kévin;76000

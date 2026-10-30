@@ -1,0 +1,11 @@
+Notes;Given Name;Téléphone 2;Commune;E-mail;Postal Code;Mutuelle;Nom de famille;Mobile;Voie
+;Théo;;Rennes;th.o44@example.fr;35000;Groupama;Roux;0612345678;31 rue du Général de Gaulle
+Client noté 3/5;Pierre-Yves;;Bordeaux;pierre.yves8@example.fr;33000;Harmonie Mutuelle;Richard;06 12 34 56 78;11 rue Victor Hugo
+;Lucas;0033712345678;Saint-Denis;lucas29@example.fr;97400;Groupama;Michel;01 45 67 89 10;13 rue du Général de Gaulle
+;Manon;0612345678;Reims;manon5@example.fr;51100;Harmonie Mutuelle;Simon;06 12 34 56 78;39 rue des Lilas
+;Lucas;06 12 34 56 78;Saint-Denis;lucas60@example.fr;97400;MGEN;Michel;06 12 34 56 78;12 rue du Général de Gaulle
+Client noté 0/5;Lucas;0033712345678;Saint-Denis;lucas4@example.fr;97400;AXA Santé;Michel;+33 6 12 34 56 78;40 rue Victor Hugo
+;Camille;;Strasbourg;camille20@example.fr;67000;Malakoff Humanis;Leroy;+33 6 12 34 56 78;22 rue Victor Hugo
+Client noté 4/5;Théo;0033712345678;Rennes;th.o35@example.fr;35000;Malakoff Humanis;Roux;01 45 67 89 10;37 rue du Général de Gaulle
+;Marie-Claire;;Toulouse;marie.claire67@example.fr;31000;Malakoff Humanis;Durand;06 12 34 56 78;22 rue de la Paix
+;Théo;0033712345678;Rennes;th.o93@example.fr;35000;MGEN;Roux;01 45 67 89 10;32 rue de la Paix

@@ -1,0 +1,15 @@
+Portable;Fixe;Mail;Address;Patronyme;Cotisation;Given Name;Zip;Organisme complémentaire santé;Localité
+0612345678;;k.vin3@example.fr;12 rue de la Paix;Moreau;"210,75";Kévin;76000;Groupama;Rouen
+0033712345678;0033712345678;jean19@example.fr;18 rue des Lilas;Dupont;"210,75";Jean;75001;Harmonie Mutuelle;Paris
+0033712345678;0612345678;marie.claire48@example.fr;8 rue de la Paix;Durand;"99,99";Marie-Claire;31000;Harmonie Mutuelle;Toulouse
+01 45 67 89 10;+33 6 12 34 56 78;camille95@example.fr;19 rue du Général de Gaulle;Leroy;"99,99";Camille;67000;Harmonie Mutuelle;Strasbourg
+0033712345678;;a.cha22@example.fr;49 rue Victor Hugo;Robert;"210,75";Aïcha;59000;AG2R La Mondiale;Lille
+0712345678;0612345678;marie.claire85@example.fr;37 rue des Lilas;Durand;"1 050,00";Marie-Claire;31000;AXA Santé;Toulouse
+01 45 67 89 10;;sophie55@example.fr;15 rue de la Paix;Martin;120 €;Sophie;69002;MAIF;Lyon
+0712345678;;k.vin22@example.fr;3 rue de la Paix;Moreau;45;Kévin;76000;MGEN;Rouen
+01 45 67 89 10;+33 6 12 34 56 78;manon67@example.fr;36 rue de la Paix;Simon;45;Manon;51100;Malakoff Humanis;Reims
+01 45 67 89 10;0612345678;k.vin59@example.fr;23 rue du Général de Gaulle;Moreau;"99,99";Kévin;76000;AXA Santé;Rouen
+0612345678;;.lodie14@example.fr;35 rue Victor Hugo;Bernard;"210,75";Élodie;06000;MAIF;Nice
+01 45 67 89 10;0712345678;camille66@example.fr;30 rue des Lilas;Leroy;"210,75";Camille;67000;Malakoff Humanis;Strasbourg
+01 45 67 89 10;+33 6 12 34 56 78;a.cha25@example.fr;46 rue de la Paix;Robert;"99,99";Aïcha;59000;Harmonie Mutuelle;Lille
++33 6 12 34 56 78;;jean20@example.fr;4 rue des Lilas;Dupont;"99,99";Jean;75001;Harmonie Mutuelle;Paris

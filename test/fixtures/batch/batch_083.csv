@@ -1,0 +1,11 @@
+Observation;E-mail;Commune;Cotisation;Fixe;Postal Code;Last Name;Mutuelle;Prénoms
+;manon48@example.fr;Reims;"75,50";;51100;Simon;MAIF;Manon
+;manon58@example.fr;Reims;"75,50";0712345678;51100;Simon;Harmonie Mutuelle;Manon
+Client noté 0/5;sophie45@example.fr;Lyon;"75,50";+33 6 12 34 56 78;69002;Martin;AXA Santé;Sophie
+;manon86@example.fr;Reims;"75,50";;51100;Simon;Groupama;Manon
+Client noté 2/5;camille63@example.fr;Strasbourg;45;;67000;Leroy;MAIF;Camille
+;k.vin94@example.fr;Rouen;88.20;;76000;Moreau;MGEN;Kévin
+Client noté 3/5;th.o83@example.fr;Rennes;"75,50";;35000;Roux;AXA Santé;Théo
+Client noté 4/5;marie.claire93@example.fr;Toulouse;"75,50";0612345678;31000;Durand;MGEN;Marie-Claire
+;fran.ois65@example.fr;Nantes;120 €;0712345678;44000;Petit;Harmonie Mutuelle;François
+;pierre.yves79@example.fr;Bordeaux;88.20;01 45 67 89 10;33000;Richard;Malakoff Humanis;Pierre-Yves;VALEUR NON CARTOGRAPHIÉE 83-9

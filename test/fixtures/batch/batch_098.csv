@@ -1,0 +1,7 @@
+Surname;Tel secondaire;Postal Code;Prénom;Address;Ville;Tel 1;Mutuelle;Remarques;Adresse électronique
+Simon;01 45 67 89 10;51100;Manon;43 rue du Général de Gaulle;Reims;0612345678;MAIF;Client noté 2/5;manon79@example.fr
+Dupont;;75001;Jean;49 rue des Lilas;Paris;+33 6 12 34 56 78;Harmonie Mutuelle;Client noté 2/5;jean46@example.fr
+Leroy;0033712345678;67000;Camille;50 rue des Lilas;Strasbourg;0612345678;AXA Santé;;camille50@example.fr
+Petit;+33 6 12 34 56 78;44000;François;24 rue du Général de Gaulle;Nantes;01 45 67 89 10;Groupama;;fran.ois44@example.fr
+Leroy;;67000;Camille;35 rue Victor Hugo;Strasbourg;06 12 34 56 78;MGEN;;camille34@example.fr
+Leroy;;67000;Camille;14 rue de la Paix;Strasbourg;01 45 67 89 10;Groupama;;camille19@example.fr

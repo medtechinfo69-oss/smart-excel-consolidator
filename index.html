@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Excel Consolidator</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="app-header-inner">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="26"
+              height="26"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <path d="M3 9h18M9 21V9" />
+            </svg>
+          </div>
+          <div>
+            <h1>Smart Excel</h1>
+            <p class="tagline">
+              Consolidez 100+ fichiers CSV &amp; XLSX français en un seul
+              classeur Excel normalisé
+            </p>
+          </div>
+        </div>
+        <div
+          class="local-badge"
+          title="Tout le traitement se fait sur cet ordinateur"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span
+            >100% local — les fichiers ne quittent jamais votre ordinateur</span
+          >
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- ================= ÉTAPE 1 : ENTÊTES ================= -->
+      <section class="card step-card" id="step1">
+        <div class="step-head">
+          <span class="step-num">1</span>
+          <div>
+            <h2>Configurer les entêtes</h2>
+            <p>
+              La configuration officielle à 11 colonnes est active par défaut.
+              Modifiez les libellés si nécessaire.
+            </p>
+          </div>
+        </div>
+
+        <div class="config-status" id="configStatus">
+          <span class="dot dot-blue"></span>
+          <span id="configStatusText"
+            >Configuration officielle intégrée active (11 entêtes)</span
+          >
+        </div>
+
+        <div class="btn-row wrap">
+          <button class="btn btn-primary" id="btnManualEdit">
+            Configuration manuelle
+          </button>
+        </div>
+
+        <!-- Configuration manuelle des 11 entêtes (ordre verrouillé) -->
+        <div id="manualPanel" class="manual-panel">
+          <p class="muted">
+            Modifiez les 11 entêtes officiels si votre organisation utilise une
+            autre présentation, puis enregistrez. L'ordre est verrouillé.
+          </p>
+          <div id="manualInputs" class="manual-grid"></div>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-sm" id="btnSaveManual">
+              Enregistrer les entêtes
+            </button>
+            <button class="btn btn-ghost btn-sm" id="btnResetManual">
+              Revenir aux entêtes officiels
+            </button>
+          </div>
+        </div>
+
+        <!-- ASSISTANT IA : Google Gemini ou Groq, clé stockée côté serveur -->
+        <div class="ai-panel" id="aiPanel">
+          <label class="ai-toggle">
+            <input type="checkbox" id="aiEnabled" checked />
+            <span
+              ><strong>Assistant IA — analyse de toutes les lignes</strong>
+              <span class="ai-toggle-hint"
+                >Coché : le fournisseur choisi lit <strong>toutes les lignes</strong>
+                de chaque fichier importé et place chaque information dans sa
+                colonne. Ce qui n'est pas identifié avec certitude n'est jamais
+                deviné : c'est envoyé dans la table « À valider » ci-dessous,
+                à confirmer avant l'export.</span
+              ></span
+            >
+          </label>
+
+          <!-- Choix du fournisseur : c'est CELUI-CI qui traite les données -->
+          <div class="ai-provider-row">
+            <label class="field-label" for="aiProvider">Fournisseur IA</label>
+            <select id="aiProvider">
+              <option value="gemini" selected>Google Gemini</option>
+              <option value="groq">Groq (Llama)</option>
+            </select>
+            <label class="ai-strict" title="Aucune ligne n'est classée par le moteur local quand le fournisseur peut le faire">
+              <input type="checkbox" id="aiStrict" checked />
+              <span>IA obligatoire (envoyer les cas incertains à valider)</span>
+            </label>
+          </div>
+
+          <div class="ai-config" id="aiKeyRow" hidden>
+            <div class="ai-field">
+              <label class="field-label" for="aiModel">Modèle</label>
+              <select id="aiModel">
+                <option value="auto" selected>
+                  Automatique — meilleur modèle disponible
+                </option>
+              </select>
+            </div>
+            <div class="ai-actions">
+              <button class="btn btn-secondary btn-sm" id="btnAiTest" type="button">
+                Tester la connexion
+              </button>
+              <button class="btn btn-ghost btn-sm" id="btnAiRetry" type="button" hidden>
+                Réessayer
+              </button>
+              <span class="ai-status" id="aiStatus">Désactivé</span>
+            </div>
+          </div>
+          <div class="ai-key" id="aiKeyBox">
+            <label class="field-label" for="aiKeyInput" id="aiKeyLabel">Clé API Google Gemini</label>
+            <div class="ai-key-row">
+              <input
+                type="password"
+                id="aiKeyInput"
+                placeholder="Collez ici votre clé Gemini (AIza…)"
+                autocomplete="off"
+                spellcheck="false" data-provider="gemini"
+              />
+              <button class="btn btn-primary btn-sm" id="btnAiKey" type="button">
+                Activer la clé
+              </button>
+              <button class="btn btn-ghost btn-sm" id="btnAiKeyToggle" type="button" aria-label="Afficher la clé">
+                Afficher
+              </button>
+            </div>
+            <p class="muted small ai-hint" id="aiKeyHintGemini">
+              Clé gratuite : <code>aistudio.google.com/apikey</code>. Elle est
+              envoyée uniquement au serveur de cet ordinateur (jamais à un site
+              tiers), vérifiée auprès de Google, puis enregistrée dans
+              <code>.env</code> pour les prochaines ouvertures.
+            </p>
+            <p class="muted small ai-hint" id="aiKeyHintGroq" hidden>
+              Clé gratuite : <code>console.groq.com</code>. Elle est
+              envoyée uniquement au serveur de cet ordinateur (jamais Ã  un site
+              tiers), vérifiée auprès de Groq, puis enregistrée dans
+              <code>.env</code> pour les prochaines ouvertures.
+            </p> L'application
+              doit être ouverte avec
+              <code>Ouvrir l'application.bat</code> (et non par double-clic sur
+              <code>index.html</code>) pour que l'assistant fonctionne.
+            </p>
+          </div>
+          <p class="muted small ai-hint" id="aiKeyHint" hidden>
+            Une clé est déjà configurée : collez-en une autre pour la remplacer.
+          </p>
+          <p class="muted small ai-hint" id="aiServerHint" hidden>
+            Le serveur local n'est pas joignable. La page a probablement été
+            ouverte par double-clic sur <code>index.html</code>. Double-cliquez
+            sur <code>Ouvrir l'application.bat</code>, puis rouvrez
+            <code>http://127.0.0.1:3000</code>.
+            <a href="http://127.0.0.1:3000/" class="ai-link">Ouvrir l'application locale</a>
+          </p>
+        </div>
+
+        <ol class="header-list" id="headerList"></ol>
+      </section>
+
+      <!-- ================= ÉTAPE 2 : IMPORT ================= -->
+      <section class="card step-card" id="step2">
+        <div class="step-head">
+          <span class="step-num">2</span>
+          <div>
+            <h2>Importer les fichiers</h2>
+            <p>
+              Sélectionnez ou glissez-déposez vos fichiers CSV et XLSX — les
+              lots de 100+ fichiers sont pris en charge.
+            </p>
+          </div>
+        </div>
+
+        <div
+          class="dropzone"
+          id="dropzone"
+          tabindex="0"
+          role="button"
+          aria-label="Déposez les fichiers ici ou cliquez pour parcourir"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="40"
+            height="40"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <p class="dz-title">Glissez-déposez vos fichiers ici</p>
+          <p class="muted">ou</p>
+          <button class="btn btn-primary" id="btnBrowse" type="button">
+            Parcourir les fichiers
+          </button>
+          <p class="muted small">
+            Formats acceptés : .csv, .txt, .xlsx, .xlsm, .xls — sélection
+            multiple activée
+          </p>
+          <input
+            type="file"
+            id="fileInput"
+            accept=".csv,.txt,.xlsx,.xlsm,.xls"
+            multiple
+            hidden
+          />
+        </div>
+
+        <div class="upload-toolbar">
+          <div class="file-counter">
+            <strong id="fileCounter">0</strong> fichier(s) sélectionné(s) ·
+            total <span id="totalSize">0 Ko</span>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-ghost btn-sm" id="btnRemoveAll">
+              Tout retirer
+            </button>
+          </div>
+        </div>
+        <div class="memory-warning" id="memoryWarning" hidden></div>
+
+        <div class="table-wrap">
+          <table class="data-table" id="fileTable">
+            <thead>
+              <tr>
+                <th>Nom du fichier</th>
+                <th>Type</th>
+                <th>Taille</th>
+                <th>Statut</th>
+                <th>Progression</th>
+                <th>Lignes ajoutées</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="fileTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= ÉTAPE 3 : TRAITEMENT AUTOMATIQUE ================= -->
+      <section class="card step-card" id="step3">
+        <div class="step-head">
+          <span class="step-num">3</span>
+          <div>
+            <h2>Traitement</h2>
+            <p>
+              Lancez le traitement : les colonnes sont détectées et remplies
+              automatiquement, sans validation manuelle.
+            </p>
+          </div>
+        </div>
+
+        <div class="btn-row wrap action-bar" id="actionBar">
+          <span hidden id="templateLoader"></span>
+          <button class="btn btn-primary btn-lg" id="btnStart">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <polygon points="6 4 20 12 6 20 6 4" />
+            </svg>
+            Démarrer le traitement
+          </button>
+          <button class="btn btn-warning" id="btnCancel" disabled>
+            Annuler
+          </button>
+        </div>
+
+        <div class="overall-progress" id="overallProgressWrap" hidden>
+          <div class="progress-label">
+            <span id="overallStage">Initialisation…</span
+            ><span id="overallPct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-bar" id="overallBar"></div>
+          </div>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="sc-value" id="sumTotal">0</div>
+            <div class="sc-label">Fichiers au total</div>
+          </div>
+          <div class="summary-card sc-green">
+            <div class="sc-value" id="sumSuccess">0</div>
+            <div class="sc-label">Fichiers réussis</div>
+          </div>
+          <div class="summary-card sc-red">
+            <div class="sc-value" id="sumFailed">0</div>
+            <div class="sc-label">Fichiers en échec</div>
+          </div>
+
+          <div class="summary-card sc-green">
+            <div class="sc-value" id="sumOkRows">0</div>
+            <div class="sc-label">Lignes ajoutées avec succès</div>
+          </div>
+        </div>
+
+        <h3 class="section-title">Traitement par fichier</h3>
+        <div class="table-wrap">
+          <table class="data-table" id="processTable">
+            <thead>
+              <tr>
+                <th>Nom du fichier</th>
+                <th>Type</th>
+                <th>Taille</th>
+                <th>Statut</th>
+                <th>Progression</th>
+              <th>Lignes ajoutées</th>
+                <th
+                  title="Voir / corriger les colonnes détectées et la ligne d'entête de ce fichier"
+                >
+                  Fiche du fichier
+                </th>
+              </tr>
+            </thead>
+            <tbody id="processTableBody"></tbody>
+          </table>
+        </div>
+
+        <div id="lineDetailSection" hidden>
+          <h3 class="section-title">
+            <span id="lineDetailTitle">Détail des lignes</span>
+            <button class="btn btn-ghost btn-sm" id="btnCloseLineDetail">
+              Fermer
+            </button>
+          </h3>
+          <div class="table-wrap">
+            <table class="data-table" id="lineDetailTable">
+              <thead>
+                <tr>
+                  <th>Fichier</th>
+                  <th>Ligne source</th>
+                  <th>Remarque</th>
+                  <th>Nom</th>
+                  <th>Prénom</th>
+                  <th>Téléphone 1</th>
+                  <th>Téléphone 2</th>
+                  <th>Cotisation</th>
+                </tr>
+              </thead>
+              <tbody id="lineDetailBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+
+
+        <div id="previewSection" hidden>
+          <h3 class="section-title">
+            Aperçu des données consolidées
+            <span class="muted small" id="previewInfo"></span>
+          </h3>
+          <div class="table-wrap preview-wrap" id="previewWrap">
+            <table class="data-table preview-table" id="previewTable"></table>
+          </div>
+          <div class="preview-placeholder" id="previewPlaceholder">
+            Aucune donnée consolidée pour le moment.
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ÉTAPE 3bis : CORRECTION MANUELLE / À VALIDER ============ -->
+      <section class="card step-card" id="stepValidation">
+        <div class="step-head">
+          <span class="step-num">!</span>
+          <div>
+            <h2>Correction manuelle / À valider</h2>
+            <p>
+              Chaque valeur que l'IA n'a pas pu placer avec certitude est
+              affichée ici. Choisissez sa colonne, puis validez. L'export reste
+              bloqué tant que des lignes ne sont pas validées.
+            </p>
+          </div>
+        </div>
+
+        <div class="review-banner" id="reviewBanner" hidden>
+          <strong id="reviewCount">0</strong> valeur(s) à valider avant l'export.
+        </div>
+
+        <div class="btn-row wrap review-actions" id="reviewActions" hidden>
+          <button class="btn btn-secondary btn-sm" id="btnReviewAcceptAll" type="button">
+            Accepter les suggestions de l'IA pour tout
+          </button>
+          <button class="btn btn-ghost btn-sm" id="btnReviewSendComment" type="button">
+            Envoyer tout dans « Commentaire »
+          </button>
+          <button class="btn btn-primary btn-sm" id="btnReviewApply" type="button">
+            Appliquer et recalculer
+          </button>
+        </div>
+
+        <div class="table-wrap" id="reviewTableWrap" hidden>
+          <table class="data-table review-table" id="reviewTable">
+            <thead>
+              <tr>
+                <th>Fichier</th>
+                <th>Ligne</th>
+                <th>Entête source</th>
+                <th>Valeur</th>
+                <th>Suggestion IA</th>
+                <th>Destination</th>
+                <th>État</th>
+              </tr>
+            </thead>
+            <tbody id="reviewTableBody"></tbody>
+          </table>
+        </div>
+        <p class="muted small" id="reviewEmpty" hidden>
+          Aucune correction en attente : tout a été classé avec certitude.
+        </p>
+        <p class="muted small" id="reviewMore" hidden></p>
+      </section>
+
+      <!-- ================= ÉTAPE 4 : EXPORT ================= -->
+      <section class="card step-card" id="step4">
+        <div class="step-head">
+          <span class="step-num">4</span>
+          <div>
+            <h2>Exporter les résultats</h2>
+            <p>
+              Le classeur est vérifié (entêtes, nombre de lignes, conservation
+              du texte, doublons) avant d'activer le téléchargement.
+            </p>
+          </div>
+        </div>
+        <div class="btn-row wrap">
+          <button class="btn btn-success btn-lg" id="btnExportExcel" disabled>
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="12" y1="18" x2="12" y2="12" />
+              <polyline points="9 15 12 12 15 15" />
+            </svg>
+            Exporter le fichier Excel final
+          </button>
+        </div>
+        <ul class="validation-list" id="validationList"></ul>
+      </section>
+
+      <footer class="app-footer">
+        <p>
+          Smart Excel fonctionne entièrement dans votre navigateur
+          avec des bibliothèques locales. Aucune base de données, aucun fichier
+          conservé : quand l'assistant Gemini est coché, le texte des lignes est
+          envoyé à Google Gemini via le serveur local pour être classé ; décoché,
+          les fichiers ne quittent jamais votre ordinateur.
+        </p>
+      </footer>
+    </main>
+
+    <!-- Fenêtre de détail d'un fichier (choix des feuilles + ligne d'entête) -->
+    <div class="modal-backdrop" id="modalBackdrop" hidden>
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalTitle"
+      >
+        <div class="modal-head">
+          <h3 id="modalTitle">Fiche du fichier</h3>
+          <button class="icon-btn" id="btnCloseModal" aria-label="Fermer">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-foot">
+          <button class="btn btn-primary btn-sm" id="btnSaveModal">
+            Enregistrer &amp; retraiter le fichier
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Indicateur d'activité (analyse d'un classeur, export) : non bloquant -->
+    <div class="busy-overlay" id="busyOverlay" hidden aria-live="polite">
+      <div class="busy-card">
+        <div class="busy-spinner" aria-hidden="true"></div>
+        <div class="busy-text" id="busyText">Traitement en cours…</div>
+        <div class="busy-track"><div class="busy-bar" id="busyBar"></div></div>
+      </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+    <script src="vendor/xlsx.full.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/encoding.js"></script>
+    <script src="js/data/communes.js"></script>
+    <script src="js/communes.js"></script>
+    <script src="js/dictionaries.js"></script>
+    <script src="js/data/mutuelles.js"></script>
+    <script src="js/normalizers.js"></script>
+    <script src="js/csv-parser.js"></script>
+    <script src="js/xlsx-reader.js"></script>
+    <script src="js/xlsx-model.js"></script>
+    <script src="js/worker-client.js"></script>
+    <script src="js/agent.js"></script>
+    <script src="js/ai/client.js"></script>
+    <script src="js/ai/gemini.js"></script>
+    <script src="js/processor.js"></script>
+    <script src="js/exporter.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
+
+

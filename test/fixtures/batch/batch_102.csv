@@ -1,0 +1,7 @@
+Téléphone fixe;Nom de famille;Portable;City;Given Name;Prime;Mutuelle;Courriel;Zip;Comments;Adresse
+;Durand;01 45 67 89 10;Toulouse;Marie-Claire;"99,99";MAIF;marie.claire40@example.fr;31000;Client noté 2/5;4 rue de la Paix
+;Richard;06 12 34 56 78;Bordeaux;Pierre-Yves;"99,99";Groupama;pierre.yves81@example.fr;33000;Client noté 3/5;3 rue du Général de Gaulle
++33 6 12 34 56 78;Petit;0033712345678;Nantes;François;120 €;AG2R La Mondiale;fran.ois97@example.fr;44000;;47 rue du Général de Gaulle;VALEUR NON CARTOGRAPHIÉE 102-2
+;Petit;+33 6 12 34 56 78;Nantes;François;"75,50";AG2R La Mondiale;fran.ois89@example.fr;44000;;1 rue Victor Hugo
+;Robert;0033712345678;Lille;Aïcha;120 €;AG2R La Mondiale;a.cha95@example.fr;59000;Client noté 1/5;31 rue Victor Hugo
++33 6 12 34 56 78;Durand;0033712345678;Toulouse;Marie-Claire;"1 050,00";AG2R La Mondiale;marie.claire57@example.fr;31000;;8 rue Victor Hugo

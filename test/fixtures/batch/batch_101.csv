@@ -1,0 +1,14 @@
+Tel 1,Address,Comments,Courriel,City,Tel secondaire,Postal Code,Nom
+01 45 67 89 10,29 rue des Lilas,Client noté 3/5,a.cha33@example.fr,Lille,,59000,Robert
+0612345678,8 rue Victor Hugo,,camille69@example.fr,Strasbourg,0033712345678,67000,Leroy
++33 6 12 34 56 78,36 rue du Général de Gaulle,Client noté 0/5,sophie8@example.fr,Lyon,,69002,Martin
+01 45 67 89 10,32 rue Victor Hugo,Client noté 0/5,.lodie11@example.fr,Nice,+33 6 12 34 56 78,06000,Bernard
++33 6 12 34 56 78,26 rue du Général de Gaulle,,.lodie44@example.fr,Nice,+33 6 12 34 56 78,06000,Bernard,VALEUR NON CARTOGRAPHIÉE 101-4
++33 6 12 34 56 78,24 rue Victor Hugo,Client noté 3/5,.lodie28@example.fr,Nice,,06000,Bernard
+06 12 34 56 78,20 rue des Lilas,Client noté 1/5,sophie18@example.fr,Lyon,06 12 34 56 78,69002,Martin
+06 12 34 56 78,22 rue des Lilas,Client noté 4/5,sophie57@example.fr,Lyon,06 12 34 56 78,69002,Martin
+0612345678,6 rue des Lilas,,camille15@example.fr,Strasbourg,0712345678,67000,Leroy
+0033712345678,37 rue de la Paix,Client noté 4/5,marie.claire72@example.fr,Toulouse,06 12 34 56 78,31000,Durand
+0712345678,48 rue Victor Hugo,,fran.ois97@example.fr,Nantes,,44000,Petit
+0033712345678,46 rue du Général de Gaulle,Client noté 0/5,k.vin48@example.fr,Rouen,0033712345678,76000,Moreau
+0612345678,23 rue du Général de Gaulle,Client noté 0/5,th.o47@example.fr,Rennes,,35000,Roux

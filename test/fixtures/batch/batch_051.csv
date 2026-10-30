@@ -1,0 +1,13 @@
+Tarif,Prénom,Tel 1,Adresse électronique,Commune,Adresse complète,Complémentaire,Fixe,Nom de famille
+"1 050,00",Pierre-Yves,0712345678,pierre.yves15@example.fr,Bordeaux,25 rue de la Paix,MGEN,+33 6 12 34 56 78,Richard
+"75,50",Théo,0033712345678,th.o76@example.fr,Rennes,14 rue de la Paix,AXA Santé,,Roux
+120 €,Camille,0712345678,camille98@example.fr,Strasbourg,13 rue du Général de Gaulle,MGEN,0712345678,Leroy
+"99,99",Théo,0612345678,th.o28@example.fr,Rennes,31 rue des Lilas,MGEN,,Roux
+"1 250,00 €",Théo,0033712345678,th.o97@example.fr,Rennes,4 rue de la Paix,MGEN,,Roux
+88.20,Élodie,01 45 67 89 10,.lodie31@example.fr,Nice,1 rue des Lilas,AXA Santé,,Bernard
+"75,50",Élodie,0033712345678,.lodie39@example.fr,Nice,49 rue du Général de Gaulle,Malakoff Humanis,0612345678,Bernard
+"99,99",Kévin,0712345678,k.vin89@example.fr,Rouen,21 rue Victor Hugo,AXA Santé,0612345678,Moreau
+"99,99",Marie-Claire,0612345678,marie.claire1@example.fr,Toulouse,32 rue Victor Hugo,Malakoff Humanis,,Durand
+45,Jean,0033712345678,jean96@example.fr,Paris,29 rue des Lilas,AG2R La Mondiale,,Dupont
+"210,75",Théo,0033712345678,th.o2@example.fr,Rennes,48 rue Victor Hugo,AXA Santé,06 12 34 56 78,Roux
+"210,75",Jean,0712345678,jean45@example.fr,Paris,38 rue de la Paix,MAIF,,Dupont

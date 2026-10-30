@@ -1,0 +1,15 @@
+Prénoms,Phone,Zip,Notes,Nom,Téléphone 2,Prime,Email
+Jean,0033712345678,75001,Client noté 1/5,Dupont,06 12 34 56 78,45,jean52@example.fr
+Élodie,01 45 67 89 10,06000,,Bernard,0612345678,120 €,.lodie24@example.fr
+Élodie,06 12 34 56 78,06000,Client noté 4/5,Bernard,01 45 67 89 10,"1 250,00 €",.lodie57@example.fr
+Sophie,01 45 67 89 10,69002,Client noté 1/5,Martin,0612345678,"99,99",sophie21@example.fr
+Sophie,0612345678,69002,,Martin,0033712345678,"210,75",sophie71@example.fr
+Manon,06 12 34 56 78,51100,,Simon,+33 6 12 34 56 78,"210,75",manon86@example.fr,VALEUR NON CARTOGRAPHIÉE 14-5
+François,+33 6 12 34 56 78,44000,Client noté 4/5,Petit,0612345678,"99,99",fran.ois35@example.fr
+Kévin,0612345678,76000,,Moreau,,"210,75",k.vin96@example.fr
+Aïcha,0712345678,59000,Client noté 4/5,Robert,,"1 050,00",a.cha59@example.fr
+Élodie,06 12 34 56 78,06000,Client noté 3/5,Bernard,,"1 250,00 €",.lodie70@example.fr
+Jean,01 45 67 89 10,75001,Client noté 4/5,Dupont,,"75,50",jean55@example.fr,VALEUR NON CARTOGRAPHIÉE 14-10
+Camille,0033712345678,67000,Client noté 4/5,Leroy,01 45 67 89 10,120 €,camille10@example.fr
+François,06 12 34 56 78,44000,,Petit,06 12 34 56 78,"1 250,00 €",fran.ois62@example.fr
+Aïcha,+33 6 12 34 56 78,59000,Client noté 1/5,Robert,0712345678,88.20,a.cha34@example.fr

@@ -1,0 +1,9 @@
+﻿Nom de famille;Prénom;Portable;Téléphone fixe;Adresse;CP;Commune;Courriel;Cotisation mensuelle;Organisme complémentaire santé;Notes client
+Dupont;Jean;06 12 34 56 78;01 45 67 89 10;12 rue de la Paix;75002;Paris;jean.dupont@example.fr;"75,50";Harmonie Mutuelle;Client fidèle
+Martin;Sophie;+33 6 12 34 56 78;;8 avenue des Champs-Élysées;01200;Bellegarde-sur-Valserine;sophie.martin@example.com;"1 250,00 €";MGEN;
+Bernard;Élodie;0033712345678;02 34 56 78 90;"""10 rue; grande entrée""";97400;Saint-Denis;elodie.bernard@example.fr;120 €;AXA Santé;Prévenir avant livraison
+Petit;François;0712345678;;1 bis place du Marché;44000;Nantes;francois.petit@example.fr;"99,99";Malakoff Humanis;
+Robert;Aïcha;06 98 76 54 32;04 50 60 70 80;"Bâtiment B, 3 allée des Tilleuls";69003;Lyon;aicha.robert@example.fr;45;Groupama;Adresse en cours de mise à jour
+Richard;Pierre-Yves;;05 56 00 11 22;22 boulevard du Général de Gaulle;33000;Bordeaux;py.richard@example.fr;"210,75";MAIF;
+Durand;Marie-Claire;06.11.22.33.44;;"Résidence Les Pins, appt 14";06000;Nice;marieclaire.durand@example.fr;"88,20";Mutuelle Générale;Conjoint également assuré
+Moreau;Kévin;+33712345678;03 20 12 34 56;5 impasse des Lilas;59000;Lille;kevin.moreau@example.fr;"1 050,00";AG2R La Mondiale;

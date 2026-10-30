@@ -1,0 +1,12 @@
+Mutuelle;Email;Adresse complète;Last Name;Zip;Fixe;Prénoms;Commentaire;Phone;Ville;Montant cotisation
+MAIF;a.cha27@example.fr;9 rue Victor Hugo;Robert;59000;06 12 34 56 78;Aïcha;Client noté 4/5;0033712345678;Lille;"99,99"
+Groupama;manon19@example.fr;32 rue de la Paix;Simon;51100;;Manon;Client noté 0/5;06 12 34 56 78;Reims;"99,99"
+Harmonie Mutuelle;camille60@example.fr;8 rue du Général de Gaulle;Leroy;67000;+33 6 12 34 56 78;Camille;;0612345678;Strasbourg;45;VALEUR NON CARTOGRAPHIÉE 88-2
+MGEN;marie.claire20@example.fr;34 rue du Général de Gaulle;Durand;31000;;Marie-Claire;Client noté 1/5;0612345678;Toulouse;"210,75"
+AXA Santé;a.cha22@example.fr;12 rue des Lilas;Robert;59000;06 12 34 56 78;Aïcha;Client noté 2/5;0712345678;Lille;"99,99"
+Harmonie Mutuelle;jean36@example.fr;45 rue Victor Hugo;Dupont;75001;0612345678;Jean;Client noté 3/5;0033712345678;Paris;120 €
+Harmonie Mutuelle;manon22@example.fr;9 rue du Général de Gaulle;Simon;51100;0033712345678;Manon;Client noté 3/5;+33 6 12 34 56 78;Reims;"1 250,00 €"
+Harmonie Mutuelle;a.cha63@example.fr;6 rue Victor Hugo;Robert;59000;;Aïcha;Client noté 2/5;+33 6 12 34 56 78;Lille;"99,99"
+Harmonie Mutuelle;th.o98@example.fr;10 rue du Général de Gaulle;Roux;35000;0612345678;Théo;;0612345678;Rennes;120 €
+AXA Santé;.lodie4@example.fr;39 rue de la Paix;Bernard;06000;;Élodie;Client noté 1/5;+33 6 12 34 56 78;Nice;45
+AG2R La Mondiale;.lodie64@example.fr;46 rue de la Paix;Bernard;06000;06 12 34 56 78;Élodie;;0033712345678;Nice;88.20

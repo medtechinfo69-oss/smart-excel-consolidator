@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-10-27T00:00:00.000Z",
+  "headers": [
+    "Nom",
+    "Prénom",
+    "Téléphone 1",
+    "Téléphone 2",
+    "Adresse",
+    "Code postal",
+    "Ville",
+    "Email",
+    "Cotisation",
+    "Mutuelle",
+    "Commentaire"
+  ],
+
+  "mappingRules": {
+    "nom de famille": { "target": "nom", "sourceHeader": "Nom de famille" },
+    "last name": { "target": "nom", "sourceHeader": "Last Name" },
+    "given name": { "target": "prenom", "sourceHeader": "Given Name" },
+    "portable": { "target": "tel1", "sourceHeader": "Portable" },
+    "telephone fixe": { "target": "tel2", "sourceHeader": "Telephone fixe" },
+    "cp": { "target": "cp", "sourceHeader": "CP" },
+    "commune": { "target": "ville", "sourceHeader": "Commune" },
+    "courriel": { "target": "email", "sourceHeader": "Courriel" },
+    "cotisation mensuelle": { "target": "cotisation", "sourceHeader": "Cotisation mensuelle" },
+    "organisme complementaire sante": { "target": "mutuelle", "sourceHeader": "Organisme complémentaire santé" },
+    "notes client": { "target": "commentaire", "sourceHeader": "Notes client" }
+  }
+}
