@@ -21,9 +21,9 @@
     });
   }
 
-  /* Optional online assistant (Google Gemini). The AI client only exists when
-   * the backend has a key in .env and the assistant is enabled: without it,
-   * everything stays local. */
+  /* Optional online assistant (Gemini / Groq), called directly from the page.
+   * The AI client only exists when a key is stored in this browser and the
+   * assistant is enabled: without it, everything stays local. */
   function aiAssistant() {
     return SEC.AI && typeof SEC.AI.suggestSheet === 'function' ? SEC.AI : null;
   }
@@ -155,7 +155,7 @@
     if (code === 'quota') return 'quota gratuit epuise pour aujourd hui';
     if (code === 'auth') return 'cle Gemini refusee (invalide ou sans acces)';
     if (code === 'no-key') return 'aucune cle Gemini configuree';
-    if (code === 'network') return 'serveur local ou internet injoignable';
+    if (code === 'network') return 'internet injoignable';
     if (code === 'disabled') return 'assistant IA desactive';
     /* Otherwise keep the first sentence, cleaned. */
     var first = msg.split(/\n|\*\s|\.\s{2,}/)[0].replace(/\s+/g, ' ').trim();
@@ -167,7 +167,7 @@
     if (code === 'quota') return 'Quota gratuit epuise : attendre demain ou activer la facturation Google';
     if (code === 'auth') return 'Coller une cle Gemini valide puis cliquer « Activer la cle »';
     if (code === 'no-key') return 'Coller une cle Gemini dans le panneau de l assistant';
-    if (code === 'network') return 'Ouvrir l application avec « Ouvrir l application.bat » et verifier internet';
+    if (code === 'network') return 'Verifier la connexion internet puis reessayer';
     return 'Verifier la cle Gemini, le quota gratuit et la connexion internet';
   }
 
@@ -210,7 +210,7 @@
         ? label + ' a confirmé ' + hints + ' destination(s) de colonnes sur ' + requests +
           ' bloc(s) analysé(s)' + modelText
         : label + ' n a pas pu répondre : ' + (st.lastError || 'aucune colonne ambiguë') + ' — moteur local utilisé',
-      suggestion: hints ? 'Destinations vérifiées par l assistant IA' : 'Vérifier la clé dans .env et la connexion internet',
+      suggestion: hints ? 'Destinations vérifiées par l assistant IA' : 'Vérifier la clé de l assistant et la connexion internet',
       severity: hints ? 'info' : 'warning'
     });
   }
