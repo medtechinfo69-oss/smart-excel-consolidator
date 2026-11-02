@@ -80,14 +80,20 @@
   function updateOverall() {
     var total = session.fileOrder.length;
     if (!total) { $('#overallProgressWrap').hidden = true; return; }
-    var done = 0, progressSum = 0;
+    var done = 0, progressSum = 0, active = null;
     session.files.forEach(function (f) {
       progressSum += f.progress || 0;
       if (['completed', 'completed_warnings', 'failed', 'cancelled'].indexOf(f.status) !== -1) done++;
+      else if (f.status === 'processing' || f.status === 'validating') active = f;
     });
     var pct = Math.round(progressSum / total);
-    var stage = session.running ? 'Traitement des fichiers… (' + done + '/' + total + ')' :
-      done === total ? 'Lot terminé' : 'En attente de démarrage';
+    /* The active file's stage (« Extraction : Feuille1 », « Analyse IA :
+     * 45 / 300 lignes ») is part of the line: without it the bar moved but
+     * the text never changed and the run looked frozen. */
+    var stage = session.running
+      ? 'Traitement des fichiers… (' + done + '/' + total + ')' +
+        (active && active.stage ? ' — ' + active.stage : '')
+      : done === total ? 'Lot terminé' : 'En attente de démarrage';
     UI.setOverallProgress(pct, stage);
   }
 
@@ -683,17 +689,25 @@
     var batchPromise = session.startBatch(entries, {
       readBuffer: readBuffer,
       parseFn: parseInWorker,
-      yieldFn: yieldToUI,
+      /* Every yield also repaints (scheduleRefresh is throttled to ~3/s):
+       * without this the tables froze for the whole extraction — the
+       * classic « no progression » report. */
+      yieldFn: function () {
+        updateOverall();
+        scheduleRefresh();
+        return yieldToUI();
+      },
       /* Cheap local repaint only: the full tables are refreshed by the
        * coalesced scheduleRefresh below. */
-      onProgress: function () { updateOverall(); },
+      onProgress: function () { updateOverall(); scheduleRefresh(); },
       /* Real-time AI progress: the stage text and the percentage follow the
        * rows the provider has actually answered (file reading, AI analysis,
        * corrections and export each report their own stage). */
-      onAiProgress: function (entry, done, total) {
-        var g = $('#overallStage');
-        if (g) g.textContent = entry.stage + ' — ' + (total ? Math.round((done / total) * 100) : 0) + '%';
+      onAiProgress: function () {
+        /* updateOverall() now includes the file's stage (the AI row counter);
+         * scheduleRefresh repaints the file table's progress bar. */
         updateOverall();
+        scheduleRefresh();
       }
     });
     /* Lock the controls synchronously: no race window for a second click. */

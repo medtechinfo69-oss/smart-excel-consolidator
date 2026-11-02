@@ -753,40 +753,62 @@ function sanitizeSheetRows(payload) {
   return { headers: headers, rows: rows };
 }
 
-/* Only the exact source text may be placed: a re-typed / guessed value is
- * rejected so the export can never contain something that was not read. */
-function sourceTexts(payload) {
-  const set = Object.create(null);
-  const norm = (s) =>
-    String(s)
-      .toLowerCase()
+/* Words of a value / of one source row — the SAME tokenizer the processor
+ * uses (rowWordSet), so both layers accept and reject identical answers. */
+function textWords(s) {
+  return (
+    String(s == null ? "" : s)
       .replace(/\u00a0/g, " ")
-      .replace(/\s+/g, " ")
-      .replace(/[.;:,]+$/g, "")
-      .trim();
-  payload.rows.forEach((r) => {
-    r.c.forEach((v) => {
-      const n = norm(v);
-      if (n) set[n] = true;
-    });
-  });
-  return { set: set, norm: norm };
+      .toLowerCase()
+      .match(/[0-9a-z\u00e0-\u00f6\u00f8-\u00ff]+/g) || []
+  );
 }
 
-/* Split a value returned by Gemini into the parts that come from a source
- * cell and the parts the model added from nowhere. */
+function normText(s) {
+  return String(s == null ? "" : s)
+    .toLowerCase()
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/[.;:,]+$/g, "")
+    .trim();
+}
+
+/* Per-ROW source index: the exact cells AND the words of THAT row only. */
+function sourceTextsForRow(row) {
+  const cells = Object.create(null);
+  const words = Object.create(null);
+  (row.c || []).forEach((v) => {
+    const n = normText(v);
+    if (n) cells[n] = true;
+    textWords(v).forEach((w) => {
+      words[w] = true;
+    });
+  });
+  return { cells: cells, words: words };
+}
+
+/* Keep only what the row itself contains. A value is accepted when it is an
+ * exact cell OR when every one of its words exists on THAT row: the model is
+ * TOLD to split "DUPONT Jean" into nom="DUPONT" + prenom="Jean", and the old
+ * whole-cell check threw those correct splits away (names ended up in
+ * Commentaire, fake review items blocked the export). A value borrowed from
+ * ANOTHER row is still rejected — provenance is per row, never per batch. */
 function splitFromSource(value, src) {
   const raw = String(value == null ? "" : value).trim();
   if (!raw) return { kept: "", invented: "" };
-  const whole = src.norm(raw);
-  if (src.set[whole]) return { kept: raw, invented: "" };
+  if (src.cells[normText(raw)]) return { kept: raw, invented: "" };
+  const tokens = textWords(raw);
+  if (tokens.length && tokens.every((w) => src.words[w]))
+    return { kept: raw, invented: "" };
   /* A value assembled with a separator is accepted segment by segment. */
   const parts = raw.split(/\s*(?:\||;|\/|\n)\s*/).filter(Boolean);
   if (parts.length > 1) {
     const kept = [];
     const invented = [];
     parts.forEach((p) => {
-      if (src.set[src.norm(p)]) kept.push(p);
+      const pt = textWords(p);
+      if (src.cells[normText(p)] || (pt.length && pt.every((w) => src.words[w])))
+        kept.push(p);
       else invented.push(p);
     });
     return { kept: kept.join(" | "), invented: invented.join(" | ") };
@@ -827,7 +849,10 @@ function validateSheetRows(parsed, payload) {
   payload.rows.forEach((r) => {
     byIndex[r.i] = r;
   });
-  const src = sourceTexts(payload);
+  const srcByRow = Object.create(null);
+  payload.rows.forEach((r) => {
+    srcByRow[r.i] = sourceTextsForRow(r);
+  });
   const rows = {};
   const invalid = [];
   list.forEach((entry) => {
@@ -839,7 +864,8 @@ function validateSheetRows(parsed, payload) {
       /* Only the 11 official keys are read, and an array/object is never a
        * cell value (a malformed answer must not break the line). */
       if (typeof entry[key] !== "string") return;
-      const part = splitFromSource(entry[key], src);
+      const row = byIndex[Math.floor(i)];
+      const part = splitFromSource(entry[key], srcByRow[row.i]);
       if (part.kept) values[key] = part.kept;
       if (part.invented) {
         invalid.push({ i: Math.floor(i), key: key, value: part.invented });
