@@ -1,23 +1,24 @@
 /* ============================================================
- * Smart Excel - Google Gemini client (browser side)
+ * Smart Excel - AI assistant client (browser side)
  * ------------------------------------------------------------
- * The assistant is Google Gemini, and the API key NEVER reaches the
- * browser: every call goes through the local server (/api/ai/*),
- * which reads GEMINI_API_KEY from .env.
+ * Google Gemini and Groq are called DIRECTLY from this page (no
+ * local server): the key the user pastes lives in this browser
+ * only (localStorage) and is sent only to the provider itself.
  *
  * Guarantees:
- *  - FULL-SHEET mode (default when the assistant is ticked): Gemini receives
- *    the text of EVERY row of EVERY sheet and places each piece of
- *    information in its official column, splits Nom / Prénom and sends what
- *    it cannot identify to Commentaire. Batches of 300 rows keep the flow
- *    memory-bounded; the same rows are never sent twice.
- *  - Column mode (headers + a few samples of the ambiguous columns) is kept
- *    for the connection test and as a column-level check.
+ *  - FULL-SHEET mode (default when the assistant is ticked): the
+ *    provider receives the text of EVERY row of EVERY sheet and
+ *    places each piece of information in its official column,
+ *    splits Nom / Prénom and sends what it cannot identify to
+ *    Commentaire. Batches keep the flow memory-bounded; the same
+ *    rows are never sent twice.
+ *  - Column mode (headers + a few samples of the ambiguous
+ *    columns) is kept for the connection test.
  *  - The AI is never silently skipped: a failure comes back as
- *    { __error, code, message } so the caller names it, and the local engine
- *    finishes processing and export. "Enabled but not usable yet" (no key,
- *    server down) stops the batch with an explicit reason instead of quietly
- *    running 100 % locally.
+ *    { __error, code, message } so the caller names it, and the
+ *    local engine finishes processing and export. "Enabled but
+ *    not usable yet" (no key, network down) stops the batch with
+ *    an explicit reason instead of quietly running 100% locally.
  * ============================================================ */
 (function (root) {
   "use strict";
@@ -47,7 +48,7 @@
     provider: DEFAULT_PROVIDER,
     model: "auto",
     available: {}, // state.provider -> true when the backend has a key
-    modelsByProvider: {}, // state.provider -> [model ids] (from /api/ai/status)
+    modelsByProvider: {}, // state.provider -> [model ids] (cached)
     checked: false,
     reachable: null, // null unknown / true / false
     stopped: false, // no more calls this session (quota/auth/offline)
@@ -67,30 +68,9 @@
   };
   var cache = new Map(); // headerNorm -> target key
   var cacheParts = {}; // headerNorm -> { nom, prenom } (Gemini name split)
-  /* Test hook (Node suite only): forces LIBSIM in the sandboxed context. */
-  var SIM = (function () {
-    try {
-      return LIBSIM || null;
-    } catch (e) {
-      return null;
-    }
-  })();
-
-  function isSimulating() {
-    return !!(SIM && SIM.aiState);
-  }
-  function testState() {
-    return (SIM && SIM.aiState) || {};
-  }
-
-  /* Is the selected provider usable? (backend reachable + key present in .env) */
+  /* Is the selected provider usable? (its key is present in this browser) */
   function backendAvailable() {
-    if (isSimulating()) {
-      return (
-        !!testState().available[state.provider] && testState().reachable !== false
-      );
-    }
-    if (!state.checked) return true; // optimistic until the server answers
+    if (!state.checked) return true; // optimistic until the status is read
     return !!state.available[state.provider];
   }
 
@@ -131,9 +111,9 @@
       usedModel: state.lastModel,
       usedModelRequested: state.lastModelRequested || "auto",
       models: state.modelsByProvider[state.provider] || [],
-      available: isSimulating() ? testState().available : state.available,
-      checked: isSimulating() ? true : state.checked,
-      reachable: isSimulating() ? testState().reachable : state.reachable,
+      available: state.available,
+      checked: state.checked,
+      reachable: state.reachable,
       stopped: state.stopped,
       lastError: state.lastError,
       lastModel: state.lastModel,
@@ -151,42 +131,10 @@
     };
   }
 
-  function withTimeout(ms) {
-    var controller =
-      typeof AbortController === "function" ? new AbortController() : null;
-    var timer = controller
-      ? setTimeout(function () {
-          controller.abort();
-        }, ms)
-      : null;
-    return {
-      signal: controller ? controller.signal : undefined,
-      done: function () {
-        if (timer) clearTimeout(timer);
-      },
-    };
-  }
-
-  /* The page was opened directly from disk: a browser NEVER lets a file://
-   * page call the local server (CORS), whatever the assistant is. Saying so
-   * clearly beats a raw "Failed to fetch". */
-  function nodeServerError() {
-    return new Error(
-      "page ouverte directement (file://) : ouvrez l'application avec « Ouvrir l'application.bat » (http://127.0.0.1:3000) pour activer Gemini",
-    );
-  }
-  /* Base URL of the local server. On http(s) the page IS served by it, so a
-   * RELATIVE url reaches the right instance whatever the host/port used
-   * (localhost, 127.0.0.1, another port). A page opened from disk must target
-   * the classic port. */
-  function apiUrl(url) {
-    if (!isFilePage()) return url;
-    return "http://127.0.0.1:3000" + url;
-  }
-
-  var filePageOverride = null; // test hook only
+  /* A page opened from disk has origin "null": direct provider calls are
+   * still attempted (Google and Groq answer CORS for browser pages); the
+   * field below only reports where the page was opened from. */
   function isFilePage() {
-    if (filePageOverride !== null) return filePageOverride;
     try {
       return !!(root.location && root.location.protocol === "file:");
     } catch (e) {
@@ -194,129 +142,80 @@
     }
   }
 
-  function fetchJson(url, options, timeoutMs, allowFromFile) {
-    if (typeof fetch !== "function")
-      return Promise.reject(new Error("fetch indisponible"));
-    if (isFilePage() && !isSimulating() && !allowFromFile)
-      return Promise.reject(nodeServerError());
-    var guard = withTimeout(timeoutMs || MAP_TIMEOUT_MS);
-    var opts = Object.assign(
-      { headers: { "Content-Type": "application/json" } },
-      options || {},
-    );
-    if (guard.signal) opts.signal = guard.signal;
-    return fetch(apiUrl(url), opts)
-      .then(function (res) {
-        var ctype =
-          res.headers && res.headers.get
-            ? res.headers.get("content-type") || ""
-            : "";
-        if (res.status === 404 && ctype.indexOf("json") === -1) {
-          /* The port answers but not with our API: an older copy of the app is
-           * still running there. Nothing to do with the key. */
-          throw new Error(
-            "une ancienne version du serveur local tourne encore — fermez la fenetre noire puis relancez « Ouvrir l'application.bat »",
-          );
-        }
-        if (ctype.indexOf("html") !== -1) {
-          throw new Error("Serveur local injoignable (lancez « Ouvrir l'application.bat »)");
-        }
-
-        return res.text().then(function (raw) {
-          var json = null;
-          try {
-            json = JSON.parse(raw);
-          } catch (e) {
-            /* server down / file:// */
-          }
-          if (!json)
-            throw new Error("Serveur local injoignable (lancez « npm start »)");
-          return json;
-        });
-      })
-      .catch(function (err) {
-        if (err && err.name === "AbortError")
-          throw new Error("délai dépassé (assistant IA)");
-        /* "Failed to fetch" means the local server is not running (or the page
-         * is not served by it): explain it instead of the browser's wording. */
-        if (err && /failed to fetch|load failed|networkerror/i.test(err.message || "")) {
-          throw new Error(
-            isFilePage()
-              ? nodeServerError().message
-              : "serveur local introuvable — lancez « Ouvrir l'application.bat » (ou npm start)",
-          );
-        }
-        throw err;
-      })
-      .then(
-        function (json) {
-          guard.done();
-          return json;
+  /* Hard deadline around a provider call: the local engine always regains
+   * control (never hangs a batch). The underlying call may still finish in
+   * the background; its late answer is simply ignored. */
+  function withDeadline(promise, ms, message) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var timer = setTimeout(function () {
+        if (done) return;
+        done = true;
+        reject(new Error(message || "délai dépassé (assistant IA)"));
+      }, ms);
+      promise.then(
+        function (v) {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve(v);
         },
-        function (err) {
-          guard.done();
-          throw err;
+        function (e) {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          reject(e);
         },
       );
+    });
   }
 
-  /* Ask the backend whether the Gemini key is present (and its models). */
+  /* Read the key status stored in THIS browser (localStorage): instant,
+   * offline, no server involved. */
   function refreshStatus() {
-    if (isSimulating() && testState().reachable === false)
-      return Promise.resolve(status());
-    return fetchJson("/api/ai/status", { method: "GET" }, STATUS_TIMEOUT_MS)
-      .then(function (json) {
-        /* Only the Gemini entry matters: read it by its exact key (iterating
-         * the object left `state.available` empty, so the assistant disabled
-         * itself with no error at all). */
-        var info = (json.providers || {})[state.provider];
-        state.available = {};
-        if (info) info = Object.assign({}, info);
-        state.available[state.provider] = !!(info && info.configured);
-        if (info && Array.isArray(info.models) && info.models.length)
-          state.modelsByProvider[state.provider] = info.models;
-        else if (!state.modelsByProvider[state.provider])
-          state.modelsByProvider[state.provider] = [];
-        state.checked = true;
-        state.reachable = true;
-        return status();
-      })
-      .catch(function (err) {
-        state.checked = true;
-        state.reachable = false;
-        state.lastError = err.message;
-        return status();
-      });
+    try {
+      var providers = SEC.AIProviders
+        ? SEC.AIProviders.providersStatus()
+        : {};
+      var info = providers[state.provider];
+      state.available = {};
+      state.available[state.provider] = !!(info && info.configured);
+      if (info && Array.isArray(info.models) && info.models.length)
+        state.modelsByProvider[state.provider] = info.models;
+      else if (!state.modelsByProvider[state.provider])
+        state.modelsByProvider[state.provider] = [];
+      state.checked = true;
+      state.reachable = true;
+    } catch (e) {
+      state.checked = true;
+      state.reachable = false;
+      state.lastError = e.message;
+    }
+    return Promise.resolve(status());
   }
 
   /* Real connection test: lists the free-tier models and generates a tiny
-   * mapping. Reports the exact model used, or the exact error. */
+   * mapping directly with the provider. Reports the exact model used, or the
+   * exact error. */
   function test() {
     return refreshStatus()
-      .then(function (st) {
-        if (!st.reachable)
-          return { ok: false, code: "network", error: st.lastError };
-        if (!st.available[state.provider]) {
-          return {
-            ok: false,
-            code: "no-key",
-            error: "Aucune clé GEMINI_API_KEY dans .env",
-          };
-        }
-        return fetchJson(
-          "/api/ai/test",
-          {
-            method: "POST",
-            body: JSON.stringify({ provider: state.provider, model: state.model }),
-          },
+      .then(function () {
+        if (!SEC.AIProviders)
+          return { ok: false, code: "network", error: "moteur IA indisponible" };
+        return withDeadline(
+          SEC.AIProviders.testProvider(state.provider),
           TEST_TIMEOUT_MS,
         ).then(function (res) {
           if (res.ok) {
             state.lastModel = res.model || "";
             if (Array.isArray(res.models) && res.models.length)
               state.modelsByProvider[state.provider] = res.models;
+            state.available[state.provider] = true;
+            state.reachable = true;
             return { ok: true, model: res.model, models: res.models || [] };
           }
+          if (res.code === "no-key") state.available[state.provider] = false;
+          if (res.code === "network") state.reachable = false;
           state.lastError = res.error || res.code || "erreur IA";
           return {
             ok: false,
@@ -327,56 +226,113 @@
         });
       })
       .catch(function (err) {
+        state.reachable = false;
         return { ok: false, code: "network", error: err.message };
       });
   }
 
-  /* Paste a key: the server validates it with Google, stores it and writes it
-   * to .env. Works from a page opened from disk too (its "null" origin can
-   * only POST a key to this machine, never read another site's data). */
+  /* Paste a key: validated directly with the provider, then stored in THIS
+   * browser (localStorage) so it survives a reload. Only a masked hint is
+   * ever displayed. */
   function setKey(rawKey) {
     var key = String(rawKey || "").trim();
-    if (!key) return Promise.resolve({ ok: false, code: "bad-request", error: "Clé vide" });
-    if (typeof fetch !== "function")
-      return Promise.resolve({ ok: false, code: "network", error: "fetch indisponible" });
-    /* This call is deliberately allowed from file:// too (see filePage below):
-     * fetchJson refuses other calls there, so it is bypassed on purpose. */
-    return fetchJson(
-      "/api/ai/key",
-      { method: "POST", body: JSON.stringify({ key: key, provider: state.provider }) },
-      TEST_TIMEOUT_MS,
-    )
-      .then(function (res) {
-        if (!res.ok) {
-          state.lastError = res.error || res.code || "clé refusée";
-          return { ok: false, code: res.code, error: res.error };
+    if (!key)
+      return Promise.resolve({ ok: false, code: "bad-request", error: "Clé vide" });
+    if (!SEC.AIProviders)
+      return Promise.resolve({ ok: false, code: "network", error: "moteur IA indisponible" });
+    return SEC.AIProviders.setApiKey(key, state.provider)
+      .then(function (r) {
+        if (!r.ok) {
+          state.lastError = r.error || r.code || "clé refusée";
+          return { ok: false, code: r.code, error: r.error };
         }
-        /* Proven: the assistant restarts cleanly with this key. */
-        state.stopped = false;
-        state.skip = {};
-        state.lastError = "";
-        state.available[state.provider] = true;
-        state.checked = true;
-        state.reachable = true;
-        state.lastModel = res.model || state.lastModel;
-        if (Array.isArray(res.models) && res.models.length)
-          state.modelsByProvider[state.provider] = res.models;
-        cache.clear(); // a new key may answer differently: nothing stale
-        return { ok: true, model: res.model, models: res.models || [], masked: res.masked };
+        /* Proven end to end: model list + one tiny generation. */
+        return withDeadline(
+          SEC.AIProviders.testProvider(state.provider),
+          TEST_TIMEOUT_MS,
+        ).then(
+          function (t) {
+            state.stopped = false;
+            state.skip = {};
+            state.lastError = "";
+            state.available[state.provider] = true;
+            state.checked = true;
+            state.reachable = true;
+            state.lastModel = (t && t.model) || state.lastModel;
+            var models =
+              (t && Array.isArray(t.models) && t.models.length
+                ? t.models
+                : r.models) || [];
+            if (models.length) state.modelsByProvider[state.provider] = models;
+            cache.clear(); // a new key may answer differently: nothing stale
+            return {
+              ok: true,
+              model: (t && t.model) || "",
+              models: models,
+              masked: r.mask,
+            };
+          },
+          function () {
+            /* The key IS validated and stored; only the generation proof
+             * timed out — activate anyway with the fetched model list. */
+            state.stopped = false;
+            state.skip = {};
+            state.lastError = "";
+            state.available[state.provider] = true;
+            state.checked = true;
+            state.reachable = true;
+            var models = r.models || [];
+            if (models.length) state.modelsByProvider[state.provider] = models;
+            cache.clear();
+            return { ok: true, model: "", models: models, masked: r.mask };
+          },
+        );
       })
       .catch(function (err) {
+        state.reachable = false;
         return { ok: false, code: "network", error: err.message };
       });
   }
 
   function models() {
-    return fetchJson(
-      "/api/ai/models?provider=" + state.provider,
-      { method: "GET" },
+    if (!SEC.AIProviders)
+      return Promise.resolve({
+        ok: false,
+        code: "network",
+        error: "moteur IA indisponible",
+        models: [],
+      });
+    var key = SEC.AIProviders.apiKey(state.provider);
+    if (!key)
+      return Promise.resolve({
+        ok: false,
+        code: "no-key",
+        error: "aucune clé",
+        models: [],
+      });
+    return withDeadline(
+      SEC.AIProviders.getModels(state.provider, key, false),
       MAP_TIMEOUT_MS,
-    ).catch(function (err) {
-      return { ok: false, code: "network", error: err.message, models: [] };
-    });
+    )
+      .then(function (res) {
+        if (res.error)
+          return {
+            ok: false,
+            code: res.error.code,
+            error: res.error.message,
+            models: [],
+          };
+        var info = SEC.AIProviders.providersStatus()[state.provider] || {};
+        return {
+          ok: true,
+          provider: state.provider,
+          models: res.models || [],
+          model: info.model || "",
+        };
+      })
+      .catch(function (err) {
+        return { ok: false, code: "network", error: err.message, models: [] };
+      });
   }
 
   function columnPayload(col) {
@@ -484,16 +440,12 @@
     };
     var payload = pending.slice(0, MAX_COLUMNS).map(columnPayload);
     state.requests++;
-    return fetchJson(
-      "/api/ai/map",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          provider: state.provider,
-          model: state.model,
-          columns: payload,
-        }),
-      },
+    return withDeadline(
+      SEC.AIProviders.mapColumns({
+        provider: state.provider,
+        model: state.model,
+        columns: payload,
+      }),
       MAP_TIMEOUT_MS,
     )
       .then(function (res) {
@@ -627,8 +579,8 @@
           ? "Assistant IA désactivé"
           : state.lastError ||
             (state.reachable === false
-              ? "serveur local injoignable (ouvrez « Ouvrir l'application.bat »)"
-              : "clé Gemini absente ou refusée"),
+              ? "connexion au fournisseur impossible (réseau)"
+              : "clé absente ou refusée — collez-la dans le panneau IA"),
       });
     }
     var list = Array.isArray(rows) ? rows : [];
@@ -686,9 +638,8 @@
       var go = wait ? sleepMs(wait) : Promise.resolve();
       return go
         .then(function () {
-          return fetchJson(
-            "/api/ai/sheet",
-            { method: "POST", body: JSON.stringify(payload) },
+          return withDeadline(
+            SEC.AIProviders.mapRows(payload),
             SHEET_TIMEOUT_MS,
           );
         })
@@ -848,10 +799,6 @@
     },
     _clearCache: function () {
       cache.clear();
-    },
-    /* Test hook: simulate a page opened directly from disk. */
-    _setFilePageForTest: function (v) {
-      filePageOverride = v === undefined ? null : !!v;
     },
   };
 })(typeof self !== "undefined" ? self : globalThis);

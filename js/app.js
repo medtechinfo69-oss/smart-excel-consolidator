@@ -187,10 +187,11 @@
 
 
 
-  /* ---------------- Optional AI assistant (Google Gemini) ----------------
-   * One provider only. The API key is NEVER typed in the browser: the local
-   * server reads GEMINI_API_KEY from .env. Without the server (file://), the
-   * assistant simply reports itself unavailable and everything stays local. */
+  /* ---------------- Optional AI assistant (Gemini / Groq) ---------------
+   * The provider is called DIRECTLY from this page. The API key the user
+   * pastes is stored in this browser only (localStorage) and sent only to
+   * the provider itself. Without a key the assistant reports itself
+   * unavailable and everything stays local. */
 
   var aiCheckSeq = 0;
   var AI = SEC.AI;
@@ -220,16 +221,10 @@
     return AI.PROVIDER_LABELS[AI.status().provider] || 'Google Gemini';
   }
 
-  function pageIsFile() {
-    try { return typeof location !== 'undefined' && location.protocol === 'file:'; } catch (e) { return false; }
-  }
-
   function updateAiStatus() {
     var st = AI.status();
     var retry = $('#btnAiRetry');
     var keyHint = $('#aiKeyHint');
-    var serverHint = $('#aiServerHint');
-    if (serverHint) serverHint.hidden = true;
     /* The tick in the interface is the ONLY source of truth: a status line
      * that says "active" while the box is clear (or the other way round) is
      * exactly what makes a user think Gemini ran when it did not. */
@@ -246,22 +241,18 @@
       if (box) box.checked = true; // still ticked, but Gemini failed
       setAiStatus(st.label + ' : ' + (st.lastError || 'indisponible') + ' — les lignes non classées sont traitées par le moteur local', 'warn');
       if (retry) retry.hidden = false;
-      if (serverHint && /serveur|introuvable|failed to fetch|file:\/\//i.test(st.lastError || '')) serverHint.hidden = false;
       return;
     }
     if (st.checked && !st.reachable) {
-      setAiStatus('Serveur local injoignable' + (st.lastError ? ' : ' + st.lastError : '') + ' — traitement local', 'warn');
+      setAiStatus('Connexion au fournisseur IA impossible' + (st.lastError ? ' : ' + st.lastError : '') + ' — traitement local', 'warn');
       if (retry) retry.hidden = false;
-      if (serverHint) serverHint.hidden = false;
       return;
     }
     if (!st.available[st.provider]) {
       /* Ticked but no key: the fix is in the box right above the status. */
       var keyBoxRow = $('#aiKeyBox');
       if (keyBoxRow) keyBoxRow.hidden = false;
-      setAiStatus(pageIsFile()
-        ? 'Collez votre clé Gemini ci-dessus puis cliquez « Activer la clé »'
-        : 'Aucune clé Gemini active — collez-la ci-dessus puis cliquez « Activer la clé » (traitement local en attendant)', 'warn');
+      setAiStatus('Aucune clé ' + providerLabel() + ' active — collez-la ci-dessus puis cliquez « Activer la clé » (traitement local en attendant)', 'warn');
       if (keyHint) keyHint.hidden = true;
       return;
     }
@@ -279,14 +270,6 @@
    * exact model used (or the exact error) otherwise. */
   function checkAiConnection(silent) {
     if (!AI.status().enabled) return;
-    /* A page opened from disk can never reach the local server (CORS): do not
-     * pretend to test, say what to fix. */
-    if (pageIsFile()) {
-      var sh = $('#aiServerHint');
-      if (sh) sh.hidden = false;
-      setAiStatus("Page ouverte depuis le disque — ouvrez « Ouvrir l'application.bat » pour activer Gemini (traitement local actif)", 'warn');
-      return;
-    }
     var seq = ++aiCheckSeq;
     aiBusy = true;
     setAiStatus('Vérification de la connexion à ' + providerLabel() + '…');
@@ -309,10 +292,10 @@
     });
   }
 
-  /* ---------------- Paste & activate a Gemini API key ----------------
-   * The key is POSTed to the local server, validated with Google, then stored
-   * there (memory + .env). It is never written to browser storage and never
-   * echoed back: only a masked hint is displayed. */
+  /* ---------------- Paste & activate a provider API key ----------------
+   * The key is validated directly with the provider, then stored in THIS
+   * browser (localStorage) so it survives a reload. It is never echoed back:
+   * only a masked hint is displayed. */
   var keyBusy = false;
   function activateKey() {
     var input = $('#aiKeyInput');
@@ -336,10 +319,8 @@
           : (res.error || 'clé refusée');
         /* "network" is NOT a key problem: say what to fix. */
         if (res.code === 'network') {
-          setAiStatus('Serveur local injoignable : ' + msg, 'err');
-          UI.toast('Impossible de joindre le serveur local : ' + msg, 'error');
-          var srv = $('#aiServerHint');
-          if (srv) srv.hidden = false;
+          setAiStatus('Connexion impossible : ' + msg, 'err');
+          UI.toast('Impossible de joindre ' + providerLabel() + ' : ' + msg, 'error');
           return;
         }
         setAiStatus('Clé refusée : ' + msg + ' — traitement local actif', 'err');
@@ -580,7 +561,7 @@
         ? label + ' a confirmé ' + st.mappings + ' destination(s) de colonnes sur ' + session.aiRequests +
           ' bloc(s) analysé(s)' + (st.lastModel ? ' (modèle ' + st.lastModel + ')' : '')
         : label + ' n a pas pu répondre : ' + (st.lastError || 'erreur inconnue') + ' — moteur local utilisé',
-      suggestion: st.mappings ? 'Destinations vérifiées par l assistant IA' : 'Vérifier la clé dans .env et la connexion internet',
+        suggestion: st.mappings ? 'Destinations vérifiées par l assistant IA' : 'Vérifier la clé de l assistant et la connexion internet',
       severity: st.mappings ? 'info' : 'warning'
     });
   }
@@ -1008,22 +989,18 @@
       /* Template: reuse the loaded official « En tete finale.xlsx » so its title
        * rows, header styling, column widths and every other sheet survive. */
       if (!templateBuffer) return { buffer: result.buffer, validation: result.validation };
-      /* 1) Styled engine (optional, feature-detected on the backend),
-       * 2) template-preserving local rebuild (Web Worker), 3) plain validated
-       * workbook. Each step is verified by re-opening the bytes. */
+      /* Template-preserving local rebuild, then plain validated workbook.
+       * Each step is verified by re-opening the bytes. */
       UI.busy(true, 'Application de la mise en forme du modèle…', 70);
-      return tryStyledExport(rows).then(function (styled) {
-        if (styled) return styled;
-        return buildTemplateWorkbook(rows, result.validation, continuations).then(function (tpl) {
-          if (tpl && tpl.buffer) {
-            UI.renderValidation(tpl.validation);
-            var loader = $('#templateLoader');
-            if (loader) loader.setAttribute('data-template-applied', '1');
-            return tpl;
-          }
-          UI.toast('La mise en forme du modèle n\'a pas pu être appliquée ; classeur standard validé utilisé', 'warning');
-          return { buffer: result.buffer, validation: result.validation };
-        });
+      return buildTemplateWorkbook(rows, result.validation, continuations).then(function (tpl) {
+        if (tpl && tpl.buffer) {
+          UI.renderValidation(tpl.validation);
+          var loader = $('#templateLoader');
+          if (loader) loader.setAttribute('data-template-applied', '1');
+          return tpl;
+        }
+        UI.toast('La mise en forme du modèle n\'a pas pu être appliquée ; classeur standard validé utilisé', 'warning');
+        return { buffer: result.buffer, validation: result.validation };
       });
     }).then(function (final) {
       if (!final) return;
@@ -1087,57 +1064,6 @@
     });
   }
 
-  /* Optional styled export (only when a style-capable library is installed on
-   * the server — see server/export-styled.js). Fully optional: any failure
-   * returns null and the validated local workbook is used instead. */
-  function tryStyledExport(rows) {
-    if (typeof fetch !== 'function' || !templateBuffer) return Promise.resolve(null);
-    var base64 = '';
-    try {
-      var bytes = new Uint8Array(templateBuffer);
-      var CHUNK = 0x8000;
-      var parts = [];
-      for (var i = 0; i < bytes.length; i += CHUNK) {
-        parts.push(String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK)));
-      }
-      base64 = btoa(parts.join(''));
-    } catch (e) {
-      return Promise.resolve(null);
-    }
-    var guard = typeof AbortController === 'function' ? new AbortController() : null;
-    var timer = guard ? setTimeout(function () { guard.abort(); }, 60000) : null;
-    return fetch('/api/export/xlsx', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: guard ? guard.signal : undefined,
-      body: JSON.stringify({
-        headers: session.headers,
-        rows: rows,
-        template: templateSheet ? {
-          base64: base64,
-          sheet: templateSheet.name,
-          headerRowIndex: templateSheet.headerRowIndex
-        } : { base64: base64 }
-      })
-    }).then(function (res) {
-      if (timer) clearTimeout(timer);
-      var ctype = res.headers && res.headers.get ? res.headers.get('content-type') || '' : '';
-      if (!res.ok || ctype.indexOf('json') !== -1) return null;
-      return res.arrayBuffer();
-    }).then(function (buf) {
-      if (!buf || !buf.byteLength) return null;
-      /* Re-open and VERIFY the styled workbook exactly like the local one. */
-      var validation = SEC.Exporter.validateBuffer(buf, session.headers, rows.length,
-        templateSheetName(), false, rows);
-      if (!validation.ok) return null;
-      validation.checks.push({ name: 'Mise en forme du modèle appliquée (moteur stylé)', pass: true, detail: templateSheetName() });
-      return { buffer: buf, validation: validation };
-    }).catch(function () {
-      if (timer) clearTimeout(timer);
-      return null; // offline / file:// / no library: local export wins
-    });
-  }
-
   /* The sheet the data rows are written into: the model already located the
    * official 11-header row, so use THAT sheet (not blindly the first one).
    * Reading only the sheet names also avoids re-parsing the workbook. */
@@ -1155,19 +1081,9 @@
   UI.renderHeaderList(session.headers);
   refreshAll();
   $('#overallProgressWrap').hidden = true;
-  /* Opened directly from disk: no browser lets such a page call the local
-   * server. Say it once, up front, instead of an opaque "Failed to fetch". */
-  if (pageIsFile() && $('#aiEnabled').checked) {
-    var sh = $('#aiServerHint');
-    if (sh) sh.hidden = false;
-    var kh = $('#aiKeyHint');
-    if (kh) kh.hidden = true;
-    var row = $('#aiKeyRow');
-    if (row) row.hidden = true; // pointless here: use « Ouvrir l'application.bat »
-    setAiStatus("Page ouverte depuis le disque — ouvrez « Ouvrir l'application.bat » pour activer Gemini (traitement local actif)", 'warn');
-  }
-  /* Gemini is on by default: it only runs when the backend has a key, and the
-   * local engine takes over the instant it cannot answer. */
+  /* The assistant is on by default: it only runs when a key is stored in
+   * this browser, and the local engine takes over the instant it cannot
+   * answer. */
   AI.configure({
     enabled: $('#aiEnabled').checked,
     model: selectedModel || 'auto',
@@ -1179,8 +1095,8 @@
   /* Pre-warm the parsing worker so the first file is never slowed down. */
   try { SEC.WorkerClient.prewarm(); } catch (e) { /* inline fallback */ }
 
-  /* If the backend is running, discover the Gemini key and model list once. */
-  if (typeof fetch === 'function' && !pageIsFile()) {
+  /* Discover the key stored in this browser and the provider's model list. */
+  if (typeof fetch === 'function') {
     AI.refreshStatus().then(function (st) {
       updateAiStatus();
       if (!st.reachable) return;

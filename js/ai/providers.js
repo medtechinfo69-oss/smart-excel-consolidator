@@ -1,40 +1,28 @@
 /* ============================================================
- * Smart Excel - Google Gemini assistant (backend only)
+ * Smart Excel - AI providers (browser, direct calls)
  * ------------------------------------------------------------
- * The browser NEVER sees an API key. It asks this local server to
- * map a handful of AMBIGUOUS source columns; the server calls
- * Google Gemini with the key stored in .env.
+ * Google Gemini and Groq are called DIRECTLY from this page:
+ * no local server, no proxy. The API key the user pastes is kept
+ * in THIS browser only (localStorage, one entry per provider)
+ * and is sent only to the provider itself.
  *
- * Free-tier model selection is dynamic and never hard-coded to a
- * stale model name: the model list is fetched (cached), non-text
- * models are dropped, paid-only / preview / retired models are
- * filtered out, the remaining models are ranked (free-tier
- * "flash-lite" models first) and tried in order until one answers.
- * Models Google refuses ("no longer available") are remembered for
- * the process and never offered again.
- *
- * Latency budget:
- *  - the first working model is remembered and tried FIRST next time
- *    (no rediscovery on every call);
- *  - model lists are fetched once and cached;
- *  - candidate tries are capped, so a dead endpoint can never freeze
- *    the interface.
+ * Free-tier model selection is dynamic: the model list is fetched
+ * (cached 10 min), non-text models are dropped, remaining models
+ * are ranked and tried in order until one answers.
  *
  * Every function resolves — it never throws — with
- *   { ok: true, mappings, model }  or
- *   { ok: false, code, error }     where code is one of
- *   'no-key' | 'quota' | 'auth' | 'network' | 'busy' | 'bad-request' | 'empty'
+ *   { ok: true, ... }  or  { ok: false, code, error }
  * so the application can always fall back to 100% local processing.
  *
  * Two modes:
- *   - mapColumns (headers + samples of the ambiguous columns) — cheap
- *     column-level check kept for the connection test and old clients;
- *   - mapRows (FULL sheet: every row, every cell) — Gemini reads each
- *     piece of information, places it in one of the 11 official columns,
- *     separates Nom / Prénom and sends whatever is not identifiable to
- *     Commentaire. A cell is only accepted when the model gives back the
- *     exact source text: an invented value is rejected, never exported.
+ *   - mapColumns (headers + samples of ambiguous columns) — cheap
+ *     column-level check kept for the connection test;
+ *   - mapRows (FULL sheet: every row, every cell) — the model reads
+ *     each piece of information, places it in one of the 11 official
+ *     columns, separates Nom / Prénom and sends whatever is not
+ *     identifiable to Commentaire.
  * ============================================================ */
+(function (root) {
 "use strict";
 
 /* "name" is a virtual key: a column holding a surname AND a first name. It is
@@ -110,8 +98,8 @@ const PROVIDERS = {
 /* Per-call budget. A free-tier "lite" model sometimes queues for a while, so
  * the budget is bounded: a dead endpoint can never freeze processing or the
  * export (the local engine takes over). */
-const TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 10000;
-const LIST_TIMEOUT_MS = Number(process.env.AI_LIST_TIMEOUT_MS) || 10000;
+const TIMEOUT_MS = 10000;
+const LIST_TIMEOUT_MS = 10000;
 const LIST_TTL_MS = 10 * 60 * 1000; // the model list is cached 10 minutes
 const MAX_ANSWER_TOKENS = 4096;
 /* One request carries at most this many columns: fewer, bigger requests are
@@ -125,52 +113,70 @@ const SHEET_MODES = ["column", "full"];
 /* Rows per AI request. Measured: 60 rows answer in ~7 s and are never
  * truncated; 300 rows take >2 min and risk a cut JSON, which costs MORE
  * (retry + split) than sending two smaller requests. */
-const ROWS_PER_CALL = Number(process.env.AI_ROWS_PER_CALL) || 60;
+const ROWS_PER_CALL = 60;
 const MAX_ROWS_PER_REQUEST = 4000; // safety cap on a single /api/ai/sheet call
 const MAX_CELL_CHARS = 300; // a cell is sent in full up to this length
 /* A 180-row prompt is ~6 000 tokens in and up to 8 000 out: on a slow link
  * (or a cold free-tier model) 45 s was not enough and the request was ABORTED,
- * which is exactly the "serveur local ou internet injoignable" the user saw. */
-const SHEET_CALL_TIMEOUT_MS = Number(process.env.AI_SHEET_TIMEOUT_MS) || 120000;
-const SHEET_CALL_TOKENS = Number(process.env.AI_SHEET_MAX_TOKENS) || 16384;
+ * which is exactly the "internet injoignable" the user saw. */
+const SHEET_CALL_TIMEOUT_MS = 120000;
+const SHEET_CALL_TOKENS = 16384;
 /* Free tier = 15 requests/min. Two parallel batches are safe; the per-minute
  * limiter below handles the bursts. */
 /* Requests in flight. Gemini free tier allows 15 RPM, Groq is far more
  * generous: two parallel batches roughly halve the wall-clock time of a big
  * file without tripping the limiter (the retry handles the occasional 429). */
-const SHEET_CONCURRENCY = Math.max(1, Math.min(4, Number(process.env.AI_CONCURRENCY) || 2));
+const SHEET_CONCURRENCY = 2;
 /* A per-MINUTE rate limit is TRANSIENT: wait for the delay Gemini asks for
  * and retry, instead of abandoning the whole sheet. */
-const SHEET_RATE_RETRIES = Number(process.env.AI_RATE_RETRIES) || 5;
-const SHEET_RATE_MAX_WAIT_MS = Number(process.env.AI_RATE_MAX_WAIT_MS) || 20000;
+const SHEET_RATE_RETRIES = 5;
+const SHEET_RATE_MAX_WAIT_MS = 20000;
 /* A batch that fails on a transient error is retried and then SPLIT in half:
  * a lost batch is never reported as "thousands of unclassified lines". */
-const SHEET_JOB_RETRIES = Number(process.env.AI_JOB_RETRIES) || 2;
+const SHEET_JOB_RETRIES = 2;
 
 const listCache = new Map(); // provider -> { at, models }
 const REMOVED_MODELS = new Set(); // provider|model answers that the model is retired
 const COOLDOWN = new Map(); // provider -> timestamp until which models are known busy
 const LAST_OK = new Map(); // provider -> { model, at, latency }
-let MAINTENANCE_KEY = ""; // set by loadEnv when the configured key is invalid
+let MAINTENANCE_KEY = ""; // key refused (401/403) during this session
 /* In-flight identical requests (two tickets asking the same columns because a
  * refresh re-sent them) share one network call. */
 const INFLIGHT = new Map();
-/* Key pasted in the interface (validated first). It wins over .env for the
- * current server process and is written to .env so it survives a restart. It
- * NEVER travels back to the browser: only a masked hint is exposed. */
-let RUNTIME_KEY = "";
+/* Keys pasted in the interface (validated first) are stored PER PROVIDER in
+ * this browser's localStorage so they survive a reload. They are sent only to
+ * the provider itself; only a masked hint is ever displayed. */
+const KEY_STORE = "sec.ai.keys";
 const KEY_FORMAT = /^[A-Za-z0-9._\-]{20,200}$/;
-/* The key typed in the interface is kept PER PROVIDER (switching provider
- * must not send Gemini's key to Groq). */
 const RUNTIME_KEYS = Object.create(null);
+let KEY_STORE_LOADED = false;
+function loadKeyStore() {
+  if (KEY_STORE_LOADED) return;
+  KEY_STORE_LOADED = true;
+  try {
+    const raw = root.localStorage && root.localStorage.getItem(KEY_STORE);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      ["gemini", "groq"].forEach((p) => {
+        if (typeof parsed[p] === "string" && parsed[p]) RUNTIME_KEYS[p] = parsed[p];
+      });
+    }
+  } catch (e) { /* storage disabled: keys live in memory for this session */ }
+}
+function persistKeyStore() {
+  try {
+    if (root.localStorage) root.localStorage.setItem(KEY_STORE, JSON.stringify(RUNTIME_KEYS));
+  } catch (e) { /* storage disabled: the key still works for this session */ }
+}
 
 /* ---------------- Provider configuration ---------------- */
 
 function apiKey(provider) {
   const def = PROVIDERS[provider];
   if (!def) return "";
-  if (RUNTIME_KEYS[provider]) return RUNTIME_KEYS[provider];
-  return String(process.env[def.envKey] || "").trim();
+  loadKeyStore();
+  return RUNTIME_KEYS[provider] || "";
 }
 
 /* Only a prefix/suffix is ever shown ("AIza…4f2a"): enough to recognise the
@@ -222,6 +228,7 @@ async function setApiKey(rawKey, providerName) {
           : listed.error.message,
     };
   }
+  persistKeyStore();
   return { ok: true, provider: provider, key: key, models: listed.models, mask: maskKey(key) };
 }
 
@@ -235,8 +242,7 @@ function providersStatus() {
       label: PROVIDERS[p].label,
       configured: !!key && key !== MAINTENANCE_KEY,
       masked: key ? maskKey(key) : "",
-      source: RUNTIME_KEYS[p] ? "interface" : key ? "env" : "",
-      envVar: PROVIDERS[p].envKey,
+      source: key ? "navigateur" : "",
       model: last ? last.model : "",
       models: cached ? cached.models : [],
       cachedAt: cached ? cached.at : 0,
@@ -993,14 +999,14 @@ async function mapRows(body) {
       ok: false,
       provider,
       code: "no-key",
-      error: "Clé API " + def.envKey + " absente du fichier .env",
+      error: "Aucune clé " + def.label + " configurée — collez-la dans le panneau IA",
     };
   if (MAINTENANCE_KEY === key)
     return {
       ok: false,
       provider,
       code: "auth",
-      error: "Clé API " + def.envKey + " refusée — vérifiez la clé dans .env puis relancez le serveur",
+      error: "Clé " + def.label + " refusée (401/403) — collez une nouvelle clé dans le panneau IA",
     };
   const payload = sanitizeSheetRows(body);
   if (!payload)
@@ -1035,7 +1041,7 @@ async function mapRows(body) {
   let stopped = false;
 
   /* A batch that fails is retried a few times with a growing delay, then
-   * SPLIT: a transient timeout ("serveur local ou internet injoignable") or a
+   * SPLIT: a transient timeout ("internet injoignable") or a
    * payload the model chokes on used to mark the WHOLE batch as unclassified,
    * which is how a single hiccup turned into "9 440 lignes non classées".
    * Only a really failing batch — after retries AND split — is reported. */
@@ -1355,7 +1361,7 @@ async function mapColumns(body) {
       ok: false,
       provider,
       code: "no-key",
-      error: "Clé API " + def.envKey + " absente du fichier .env",
+      error: "Aucune clé " + def.label + " configurée — collez-la dans le panneau IA",
     };
   }
   if (MAINTENANCE_KEY === key) {
@@ -1363,10 +1369,7 @@ async function mapColumns(body) {
       ok: false,
       provider,
       code: "auth",
-      error:
-        "Clé API " +
-        def.envKey +
-        " refusée — vérifiez la clé dans .env puis relancez le serveur",
+      error: "Clé " + def.label + " refusée (401/403) — collez une nouvelle clé dans le panneau IA",
     };
   }
   const columns = sanitizeColumns(body && body.columns);
@@ -1557,14 +1560,14 @@ async function testProvider(provider) {
       ok: false,
       provider: p,
       code: "no-key",
-      error: "Clé API " + def.envKey + " absente du fichier .env",
+      error: "Aucune clé " + def.label + " configurée — collez-la dans le panneau IA",
     };
   if (MAINTENANCE_KEY === key)
     return {
       ok: false,
       provider: p,
       code: "auth",
-      error: "Clé API " + def.envKey + " refusée (401/403)",
+      error: "Clé " + def.label + " refusée (401/403)",
     };
   const listed = await getModels(p, key, true);
   if (listed.error) {
@@ -1611,7 +1614,8 @@ function clearCache(clearKey) {
   MAINTENANCE_KEY = "";
 }
 
-module.exports = {
+root.SEC = root.SEC || {};
+root.SEC.AIProviders = {
   PROVIDERS,
   TARGET_KEYS,
   TARGET_LABELS,
@@ -1619,6 +1623,7 @@ module.exports = {
   setApiKey,
   normalizeKey,
   maskKey,
+  apiKey,
   mapColumns,
   testProvider,
   buildPrompt,
@@ -1636,3 +1641,4 @@ module.exports = {
   prewarm,
   clearCache,
 };
+})(typeof self !== "undefined" ? self : globalThis);

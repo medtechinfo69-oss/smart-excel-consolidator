@@ -1,26 +1,10 @@
-# Ignore environment files with API keys
-.env
-.env.local
-*.env.*.bak
-
-# Ignore dependency directories
-node_modules/
-/packages
-
-# Ignore build artifacts and output files
-/dist
-/build
-*.profraw
-
-# Ignore test output
-*.test.*
-test-results*
-unit.txt
-ui.txt
-
 # Ignore Excel and OS temporary files
 *.xlsx
-!test/**/*.xlsx
 *.tmp
 Thumbs.db
 Desktop.ini
+
+# Ignore build artifacts
+/dist
+/build
+*.profraw

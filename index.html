@@ -101,7 +101,7 @@
           </div>
         </div>
 
-        <!-- ASSISTANT IA : Google Gemini ou Groq, clé stockée côté serveur -->
+        <!-- ASSISTANT IA : Google Gemini ou Groq, appel direct, clé stockée dans le navigateur -->
         <div class="ai-panel" id="aiPanel">
           <label class="ai-toggle">
             <input type="checkbox" id="aiEnabled" checked />
@@ -168,30 +168,19 @@
             </div>
             <p class="muted small ai-hint" id="aiKeyHintGemini">
               Clé gratuite : <code>aistudio.google.com/apikey</code>. Elle est
-              envoyée uniquement au serveur de cet ordinateur (jamais à un site
-              tiers), vérifiée auprès de Google, puis enregistrée dans
-              <code>.env</code> pour les prochaines ouvertures.
+              envoyée uniquement à Google, vérifiée auprès de Google, puis
+              enregistrée dans ce navigateur (localStorage) pour les prochaines
+              ouvertures — jamais sur un autre site.
             </p>
             <p class="muted small ai-hint" id="aiKeyHintGroq" hidden>
-              Clé gratuite : <code>console.groq.com</code>. Elle est
-              envoyée uniquement au serveur de cet ordinateur (jamais Ã  un site
-              tiers), vérifiée auprès de Groq, puis enregistrée dans
-              <code>.env</code> pour les prochaines ouvertures.
-            </p> L'application
-              doit être ouverte avec
-              <code>Ouvrir l'application.bat</code> (et non par double-clic sur
-              <code>index.html</code>) pour que l'assistant fonctionne.
+              Clé gratuite : <code>console.groq.com</code>. Elle est envoyée
+              uniquement à Groq, vérifiée auprès de Groq, puis enregistrée dans
+              ce navigateur (localStorage) pour les prochaines ouvertures —
+              jamais sur un autre site.
             </p>
           </div>
           <p class="muted small ai-hint" id="aiKeyHint" hidden>
             Une clé est déjà configurée : collez-en une autre pour la remplacer.
-          </p>
-          <p class="muted small ai-hint" id="aiServerHint" hidden>
-            Le serveur local n'est pas joignable. La page a probablement été
-            ouverte par double-clic sur <code>index.html</code>. Double-cliquez
-            sur <code>Ouvrir l'application.bat</code>, puis rouvrez
-            <code>http://127.0.0.1:3000</code>.
-            <a href="http://127.0.0.1:3000/" class="ai-link">Ouvrir l'application locale</a>
           </p>
         </div>
 
@@ -401,10 +390,10 @@
         </div>
       </section>
 
-      <!-- ============ ÉTAPE 3bis : CORRECTION MANUELLE / À VALIDER ============ -->
+      <!-- ============ ÉTAPE 4 : CORRECTION MANUELLE / À VALIDER ============ -->
       <section class="card step-card" id="stepValidation">
         <div class="step-head">
-          <span class="step-num">!</span>
+          <span class="step-num">4</span>
           <div>
             <h2>Correction manuelle / À valider</h2>
             <p>
@@ -453,10 +442,10 @@
         <p class="muted small" id="reviewMore" hidden></p>
       </section>
 
-      <!-- ================= ÉTAPE 4 : EXPORT ================= -->
-      <section class="card step-card" id="step4">
+      <!-- ================= ÉTAPE 5 : EXPORT ================= -->
+      <section class="card step-card" id="step5">
         <div class="step-head">
-          <span class="step-num">4</span>
+          <span class="step-num">5</span>
           <div>
             <h2>Exporter les résultats</h2>
             <p>
@@ -494,8 +483,8 @@
         <p>
           Smart Excel fonctionne entièrement dans votre navigateur
           avec des bibliothèques locales. Aucune base de données, aucun fichier
-          conservé : quand l'assistant Gemini est coché, le texte des lignes est
-          envoyé à Google Gemini via le serveur local pour être classé ; décoché,
+          conservé : quand l'assistant IA est coché, le texte des lignes est
+          envoyé directement à Google Gemini ou Groq pour être classé ; décoché,
           les fichiers ne quittent jamais votre ordinateur.
         </p>
       </footer>
@@ -548,8 +537,8 @@
     <script src="js/xlsx-model.js"></script>
     <script src="js/worker-client.js"></script>
     <script src="js/agent.js"></script>
+    <script src="js/ai/providers.js"></script>
     <script src="js/ai/client.js"></script>
-    <script src="js/ai/gemini.js"></script>
     <script src="js/processor.js"></script>
     <script src="js/exporter.js"></script>
     <script src="js/ui.js"></script>
