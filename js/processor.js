@@ -1613,9 +1613,11 @@
         var sheet = sheets.find(function (s) { return s.name === sheetName; });
         if (!sheet || sheet.isEmpty) return;
         chain = chain.then(function () {
+          /* Announce the sheet BEFORE yielding, so the paint the yield
+           * triggers already shows it during the CPU-heavy analysis. */
+          entry.stage = 'Extraction : ' + sheetName;
           /* Analysis of a big worksheet is itself CPU-heavy: paint first. */
           return (yieldFn || nextTick)().then(function () {
-          entry.stage = 'Extraction : ' + sheetName;
           /* Optional Gemini consultation BEFORE extraction: only the columns
            * the local agent could not resolve confidently are sent (headers +
            * a few samples). Any failure leaves the local mapping untouched. */

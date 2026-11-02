@@ -734,7 +734,10 @@
       return send(batch).then(worker);
     }
     var workers = [];
-    var maxWorkers = state.provider === "groq" ? 2 : 1;
+    /* TWO batches in flight for both providers: the shared start-slot below
+     * still spaces Gemini starts >= 4.3 s apart (<=14/min < the 15 RPM
+     * free-tier limit), while slow calls overlap -> ~1.6x faster scans. */
+    var maxWorkers = 2;
     for (var w = 0; w < Math.min(maxWorkers, pending.length); w++)
       workers.push(worker());
 

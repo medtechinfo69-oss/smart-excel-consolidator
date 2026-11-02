@@ -27,7 +27,11 @@
 
   /* The four operations of the engine, run inline. */
   function runInline(type, payload, onProgress) {
-    return Promise.resolve().then(function () {
+    /* One macrotask first: lets the browser PAINT the busy overlay /
+     * progress BEFORE the synchronous SheetJS work blocks the thread —
+     * otherwise the overlay was set and consumed in the same task and the
+     * user saw a dead page for the whole parse. */
+    return new Promise(function (resolve) { setTimeout(resolve, 0); }).then(function () {
       var X = SEC.XLSXReader.getXLSX();
       var model = SEC.XlsxModel;
       if (type === "parse") {

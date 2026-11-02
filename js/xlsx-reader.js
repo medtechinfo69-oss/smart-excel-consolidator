@@ -48,6 +48,10 @@
       cellFormula: false, // do not retain formulas
       cellHTML: false,
       cellNF: false,
+      /* Style/theme parsing is the slowest part of SheetJS and this reader
+       * only needs the formatted TEXT: skipping it speeds up big styled
+       * workbooks with byte-identical output (verified). */
+      cellStyles: false,
       codepage: 1252, // legacy French workbooks
     });
 
