@@ -992,9 +992,8 @@
          * named, and the file is offered in CSV as a guaranteed fallback. */
         var failed = result.validation.checks.filter(function (c) { return !c.pass; })
           .map(function (c) { return c.name + (c.detail ? ' (' + c.detail + ')' : ''); });
-        UI.toast('Vérification incomplète : ' + failed.join(' ; ') +
-          ' — le fichier est tout de même téléchargé, plus un CSV de secours.', 'warning');
-        downloadBlob(result.buffer, 'fichier_final.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        UI.toast('Export bloqué : la vérification du classeur a échoué (' + failed.join(' ; ') +
+          ') — le fichier Excel n\'est PAS téléchargé tant qu\'il n\'est pas vérifié. Un CSV de secours contient toutes les lignes.', 'warning');
         downloadBlob(rowsToCsv(session.headers, rows), 'fichier_final_secours.csv', 'text/csv;charset=utf-8');
         return null;
       }
@@ -1005,7 +1004,7 @@
        * Each step is verified by re-opening the bytes. */
       UI.busy(true, 'Application de la mise en forme du modèle…', 70);
       return buildTemplateWorkbook(rows, result.validation, continuations).then(function (tpl) {
-        if (tpl && tpl.buffer) {
+        if (tpl && tpl.buffer && (!tpl.validation || tpl.validation.ok)) {
           UI.renderValidation(tpl.validation);
           var loader = $('#templateLoader');
           if (loader) loader.setAttribute('data-template-applied', '1');

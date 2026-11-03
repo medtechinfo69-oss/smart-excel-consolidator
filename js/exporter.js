@@ -718,6 +718,78 @@
         moved.toCommentaire++;
       });
     });
+    /* Téléphone 1/2 = phone numbers ONLY: text, dates and reminders move to
+     * Commentaire before the workbook is written. */
+    [at["Téléphone 1"], at["Téléphone 2"]].forEach(function (i) {
+      if (i === undefined) return;
+      rows.forEach(function (r) {
+        var v = r[i] == null ? "" : String(r[i]).trim();
+        if (!v) return;
+        var segs = v.split(/\s*\|\s*/).filter(Boolean);
+        var keep = [], bad = [];
+        segs.forEach(function (s) {
+          if (NM.looksLikePhone(s) && !(NM.isUnusablePhone && NM.isUnusablePhone(s))) keep.push(s);
+          else bad.push(s);
+        });
+        if (bad.length) {
+          if (iComment !== undefined) {
+            var c = r[iComment] == null ? "" : String(r[iComment]).trim();
+            var joined = bad.join(" | ");
+            r[iComment] = c ? joined + " | " + c : joined;
+          }
+          r[i] = keep.join(" | ");
+          moved.toCommentaire += bad.length;
+        }
+      });
+    });
+    /* Mutuelle = insurer names only (junk moves out, nothing is lost). */
+    if (iMut !== undefined) {
+      rows.forEach(function (r) {
+        var v = r[iMut] == null ? "" : String(r[iMut]).trim();
+        if (!v) return;
+        var segs = v.split(/\s*\|\s*/).filter(Boolean);
+        var keep = [], bad = [];
+        segs.forEach(function (s) {
+          var t = s.trim();
+          if (!t) return;
+          var off = NM.matchInsurer ? NM.matchInsurer(t) : "";
+          if (off) { keep.push(off); return; }
+          if (/^(autre|aucun(e)?|sans objet|sans|n[\/.]?a[\/.]?|neant|ras|x|-+|\.+)$/i.test(t)) return;
+          if ((NM.isNoteLike && NM.isNoteLike(t)) ||
+              (NM.looksLikeCommentText && NM.looksLikeCommentText(t)) ||
+              (NM.looksLikePhone && NM.looksLikePhone(t)) ||
+              (NM.looksLikeAmount && NM.looksLikeAmount(t)) ||
+              /\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}/.test(t)) {
+            bad.push(t);
+            return;
+          }
+          keep.push(t);
+        });
+        if (bad.length) {
+          if (iComment !== undefined) {
+            var c = r[iComment] == null ? "" : String(r[iComment]).trim();
+            var joined = bad.join(" | ");
+            r[iComment] = c ? joined + " | " + c : joined;
+            moved.toCommentaire += bad.length;
+          }
+        }
+        r[iMut] = keep.join(" | ");
+      });
+    }
+    /* A date is never a Cotisation. */
+    rows.forEach(function (r) {
+      var v = r[iPrice] == null ? "" : String(r[iPrice]).trim();
+      if (!v) return;
+      if (/\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}/.test(v) &&
+          !(NM.looksLikeAmount && NM.looksLikeAmount(v))) {
+        if (iComment !== undefined) {
+          var c = r[iComment] == null ? "" : String(r[iComment]).trim();
+          r[iComment] = c ? v + " | " + c : v;
+        }
+        r[iPrice] = "";
+        moved.toCommentaire++;
+      }
+    });
     return { rows: rows, moved: moved };
   }
 

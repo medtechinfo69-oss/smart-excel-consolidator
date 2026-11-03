@@ -41,6 +41,15 @@
   /* Read every worksheet into plain string arrays.
    * Returns [{ name, rows, isEmpty }] and releases the workbook object. */
   function parseFromLib(X, arrayBuffer, ext) {
+    /* Normalise exotic buffers (cross-realm ArrayBuffers, typed-array views):
+     * SheetJS only accepts a plain ArrayBuffer for type:'array', and a view
+     * would otherwise be read from its pooled root — corrupted sheets. */
+    if (!(arrayBuffer instanceof ArrayBuffer)) {
+      var tmp = new Uint8Array(arrayBuffer);
+      var plain = new ArrayBuffer(tmp.byteLength);
+      new Uint8Array(plain).set(tmp);
+      arrayBuffer = plain;
+    }
     checkSignature(arrayBuffer, ext);
     var wb = X.read(arrayBuffer, {
       type: "array",
