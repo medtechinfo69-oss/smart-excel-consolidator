@@ -233,6 +233,16 @@
     if (/à\s\d{1,2}h/.test(sClean)) {
       return true;
     }
+    /* A REMINDER / appointment glued into one string
+     * (« rappel lundi 08042022 a 10h »): the digits of the date and of the
+     * hour add up to exactly 10 digits starting with 0, so the value looked
+     * like a perfect French phone number and was written into « Téléphone ».
+     * A day name, an hour, an 8-digit date or a reminder word means NOTE. */
+    if (/\b(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b/.test(sClean)) return true;
+    if (/\b\d{1,2}\s*h(?:\s*\d{1,2})?\b/.test(sClean)) return true;          // 10h, 10h30
+    if (/\b(?:a|à|vers|entre|apres|après|de|jusqu)\s*\d{1,2}\s*h/.test(sClean)) return true;
+    if (/\b\d{8}\b/.test(sClean)) return true;                               // 08042022 = 08/04/2022
+    if (/\b(?:rappel|rappeler|rappelle|rappellee|rdv|rendez[- ]?vous|appel(?:er|e|le)?|repondeur|absent|occupe|injognable|injoignable|message|passera?|repasser|venir|disponible)\b/.test(sClean)) return true;
     return false;
   }
 

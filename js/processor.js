@@ -691,6 +691,55 @@
       }
     };
 
+    /* A phone number written inside a longer text
+     * (« 06 12 34 56 78 rappel lundi »): the number stays in the phone column,
+     * the reminder goes to « Commentaire ». Null when the text holds no real
+     * number — the whole text is then a note. */
+    function phoneInside(text) {
+      var t = N.trimClean(text);
+      if (!t || t.length > 120) return null;
+      var cands = t.match(/\+?\d[\d\s.\-()]{7,}\d/g);
+      if (!cands) return null;
+      for (var i = 0; i < cands.length; i++) {
+        var c = N.trimClean(cands[i]);
+        if (N.looksLikePhone(c) && !(N.isUnusablePhone && N.isUnusablePhone(c))) {
+          var an = N.analyzePhone(c);
+          var num = (an && an.value) || c;
+          var rest = N.trimClean(t.replace(c, ' ').replace(/\s{2,}/g, ' '));
+          return { phone: num, rest: rest };
+        }
+      }
+      return null;
+    }
+
+    /* A phone number found inside a short note (« 06 12 34 56 78 rappel
+     * lundi ») belongs to « Téléphone », not to the note: the number is moved
+     * to the first free phone column and only the reminder stays in
+     * « Commentaire ». Long notes are never split. */
+    function extractPhonesFromComment(values) {
+      if (!values.commentaire) return;
+      var kept = [];
+      String(values.commentaire).split(/\s*\|\s*/).forEach(function (p) {
+        var t = N.trimClean(p);
+        if (!t) return;
+        if (t.length > 60) { kept.push(t); return; }
+        var free = !values.tel1 ? 'tel1' : (!values.tel2 ? 'tel2' : null);
+        if (!free) { kept.push(t); return; }
+        if (N.looksLikePhone(t) && !(N.isUnusablePhone && N.isUnusablePhone(t))) {
+          values[free] = (N.analyzePhone(t).value || t);
+          return;
+        }
+        var inside = phoneInside(t);
+        if (inside) {
+          values[free] = inside.phone;
+          if (inside.rest) kept.push(inside.rest);
+          return;
+        }
+        kept.push(t);
+      });
+      values.commentaire = kept.join(' | ');
+    }
+
     function enforceDestinationTypes(values) {
       var pushComment = function (t) {
         var x = N.trimClean(t);
@@ -710,9 +759,17 @@
           if (N.looksLikePhone(seg) && !(N.isUnusablePhone && N.isUnusablePhone(seg))) {
             var an = N.analyzePhone(seg);
             keep.push(an.value || seg);
-          } else {
-            pushComment(seg);
+            return;
           }
+          /* « 06 12 34 56 78 rappel lundi »: the number stays here, the
+           * reminder is written in « Commentaire » — never in a phone column. */
+          var inside = phoneInside(seg);
+          if (inside) {
+            keep.push(inside.phone);
+            if (inside.rest) pushComment(inside.rest);
+            return;
+          }
+          pushComment(seg);
         });
         values[slot] = keep.join(' | ');
       });
@@ -1397,6 +1454,12 @@
                       return;
                     }
                     if (TYPED_SLOTS[key] && TYPED_SLOTS[key](s)) {
+                      var keepNum = (key === 'tel1' || key === 'tel2') ? phoneInside(s) : null;
+                      if (keepNum) {
+                        keep.push(keepNum.phone);
+                        if (keepNum.rest) values.commentaire = values.commentaire ? (values.commentaire + ' | ' + keepNum.rest) : keepNum.rest;
+                        return;
+                      }
                       values.commentaire = values.commentaire ? (values.commentaire + ' | ' + s) : s;
                       return;
                     }
@@ -1479,6 +1542,9 @@
            * back to « Commentaire » still goes to its own column when that
            * column is free (the note keeps only what is really a note). */
           redistributePackedValues(values);
+          /* A number left inside a note goes to « Téléphone »: only the
+           * reminder stays in « Commentaire ». */
+          extractPhonesFromComment(values);
 
           /* What the assistant could not identify is proposed for validation
            * ONLY now, from the CLEANED row: a piece that already sits in its
