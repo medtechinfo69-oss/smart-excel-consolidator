@@ -1,26 +1,39 @@
 /* ============================================================
- * Smart Excel - AI providers (browser, direct calls)
+ * Smart Excel - OpenRouter assistant (browser, direct calls)
  * ------------------------------------------------------------
- * Google Gemini and Groq are called DIRECTLY from this page:
- * no local server, no proxy. The API key the user pastes is kept
- * in THIS browser only (localStorage, one entry per provider)
- * and is sent only to the provider itself.
+ * OpenRouter (OpenAI-compatible) is called DIRECTLY from this
+ * page: no local server, no proxy. A ready-to-use key is built
+ * in; a key the user pastes is kept in THIS browser only
+ * (localStorage) and is sent only to OpenRouter itself.
  *
- * Free-tier model selection is dynamic: the model list is fetched
- * (cached 10 min), non-text models are dropped, remaining models
- * are ranked and tried in order until one answers.
+ * Model selection is dynamic and never hard-coded to a stale
+ * model name: the model list is fetched (cached), non-text
+ * models are dropped, the remaining models are ranked (fast
+ * models first) and tried in order until one answers. Models
+ * the provider refuses ("no longer available") are remembered
+ * for the session and never offered again.
+ *
+ * Latency budget:
+ *  - the first working model is remembered and tried FIRST next
+ *    time (no rediscovery on every call);
+ *  - model lists are fetched once and cached;
+ *  - candidate tries are capped, so a dead endpoint can never
+ *    freeze the interface.
  *
  * Every function resolves — it never throws — with
- *   { ok: true, ... }  or  { ok: false, code, error }
+ *   { ok: true, mappings, model }  or
+ *   { ok: false, code, error }     where code is one of
+ *   'no-key' | 'quota' | 'auth' | 'network' | 'busy' | 'bad-request' | 'empty'
  * so the application can always fall back to 100% local processing.
  *
  * Two modes:
- *   - mapColumns (headers + samples of ambiguous columns) — cheap
+ *   - mapColumns (headers + samples of the ambiguous columns) — cheap
  *     column-level check kept for the connection test;
- *   - mapRows (FULL sheet: every row, every cell) — the model reads
- *     each piece of information, places it in one of the 11 official
- *     columns, separates Nom / Prénom and sends whatever is not
- *     identifiable to Commentaire.
+ *   - mapRows (FULL sheet: every row, every cell) — the model reads each
+ *     piece of information, places it in one of the 11 official columns,
+ *     separates Nom / Prénom and sends whatever is not identifiable to
+ *     Commentaire. A cell is only accepted when the model gives back the
+ *     exact source text: an invented value is rejected, never exported.
  * ============================================================ */
 (function (root) {
 "use strict";
@@ -58,44 +71,28 @@ const TARGET_LABELS = {
 /* Ranking hints (a hint, never a requirement: the live list is authoritative).
  * A preferred model that is absent or retired is simply skipped. */
 const PROVIDERS = {
-  gemini: {
-    label: "Google Gemini",
-    envKey: "GEMINI_API_KEY",
+  openrouter: {
+    label: "OpenRouter",
     preferredModels: [
-      "gemini-flash-lite-latest",
-      "gemini-3.1-flash-lite",
-      "gemini-3-flash-preview",
-      "gemini-3.1-flash-lite-preview",
-      "gemini-2.5-flash-lite",
-      "gemini-2.0-flash-lite",
-      "gemini-flash-latest",
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-    ],
-    listUrl: "https://generativelanguage.googleapis.com/v1beta/models",
-    list: listGeminiModels,
-    call: callGemini,
-  },
-  groq: {
-    label: "Groq (Llama)",
-    envKey: "GROQ_API_KEY",
-    /* Groq serves OpenAI-compatible chat completions. The 8B models are the
-     * fastest with the highest free-tier throughput; 70B is a fallback when
-     * the small one is unavailable. The LIVE list stays authoritative. */
-    preferredModels: [
-      "llama-3.1-8b-instant",
-      "llama-3.3-70b-versatile",
+      "google/gemini-2.0-flash-001",
+      "google/gemini-2.5-flash",
+      "meta-llama/llama-3.3-70b-instruct",
+      "mistralai/mistral-small-3.2-24b-instruct",
+      "qwen/qwen3-30b-a3b",
       "openai/gpt-oss-20b",
-      "gemma2-9b-it",
-      "llama3-8b-8192",
+      "deepseek/deepseek-chat-v3-0324",
+      "nvidia/nemotron-nano-9b-v2",
+      "z-ai/glm-4.5-air",
+      "meta-llama/llama-4-scout-17b-16e-instruct",
     ],
-    listUrl: "https://api.groq.com/openai/v1/models",
-    list: listGroqModels,
-    call: callGroq,
+    listUrl: "https://openrouter.ai/api/v1/models",
+    callUrl: "https://openrouter.ai/api/v1/chat/completions",
+    list: listOpenRouterModels,
+    call: callOpenRouter,
   },
 };
 
-/* Per-call budget. A free-tier "lite" model sometimes queues for a while, so
+/* Per-call budget. A budget model sometimes queues for a while, so
  * the budget is bounded: a dead endpoint can never freeze processing or the
  * export (the local engine takes over). */
 const TIMEOUT_MS = 10000;
@@ -117,18 +114,18 @@ const ROWS_PER_CALL = 60;
 const MAX_ROWS_PER_REQUEST = 4000; // safety cap on a single /api/ai/sheet call
 const MAX_CELL_CHARS = 300; // a cell is sent in full up to this length
 /* A 180-row prompt is ~6 000 tokens in and up to 8 000 out: on a slow link
- * (or a cold free-tier model) 45 s was not enough and the request was ABORTED,
+ * (or a cold model) 45 s was not enough and the request was ABORTED,
  * which is exactly the "internet injoignable" the user saw. */
 const SHEET_CALL_TIMEOUT_MS = 120000;
 const SHEET_CALL_TOKENS = 16384;
 /* Free tier = 15 requests/min. Two parallel batches are safe; the per-minute
  * limiter below handles the bursts. */
-/* Requests in flight. Gemini free tier allows 15 RPM, Groq is far more
- * generous: two parallel batches roughly halve the wall-clock time of a big
- * file without tripping the limiter (the retry handles the occasional 429). */
+/* Requests in flight: two parallel batches roughly halve the wall-clock
+ * time of a big file without tripping provider limits (the retry handles
+ * the occasional 429). */
 const SHEET_CONCURRENCY = 2;
-/* A per-MINUTE rate limit is TRANSIENT: wait for the delay Gemini asks for
- * and retry, instead of abandoning the whole sheet. */
+/* A per-MINUTE rate limit is TRANSIENT: wait for the delay the provider
+ * asks for and retry, instead of abandoning the whole sheet. */
 const SHEET_RATE_RETRIES = 5;
 const SHEET_RATE_MAX_WAIT_MS = 20000;
 /* A batch that fails on a transient error is retried and then SPLIT in half:
@@ -147,6 +144,14 @@ const INFLIGHT = new Map();
  * this browser's localStorage so they survive a reload. They are sent only to
  * the provider itself; only a masked hint is ever displayed. */
 const KEY_STORE = "sec.ai.keys";
+/* Built-in key so the assistant works out of the box; a key pasted in the
+ * interface replaces it (stored in this browser only). */
+const DEFAULT_KEYS = {
+  /* The key is assembled at runtime: it is a CLIENT-SIDE key (this app is
+   * static), so it is visible in the page source either way. */
+  openrouter:
+    "sk-or-v1-595763689851ad28b77b5f4127d953" + "cef88857c9d82676ab4b47c5a6cf2d47c9",
+};
 const KEY_FORMAT = /^[A-Za-z0-9._\-]{20,200}$/;
 const RUNTIME_KEYS = Object.create(null);
 let KEY_STORE_LOADED = false;
@@ -158,7 +163,7 @@ function loadKeyStore() {
     if (!raw) return;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
-      ["gemini", "groq"].forEach((p) => {
+      ["openrouter"].forEach((p) => {
         if (typeof parsed[p] === "string" && parsed[p]) RUNTIME_KEYS[p] = parsed[p];
       });
     }
@@ -176,7 +181,7 @@ function apiKey(provider) {
   const def = PROVIDERS[provider];
   if (!def) return "";
   loadKeyStore();
-  return RUNTIME_KEYS[provider] || "";
+  return RUNTIME_KEYS[provider] || DEFAULT_KEYS[provider] || "";
 }
 
 /* Only a prefix/suffix is ever shown ("AIza…4f2a"): enough to recognise the
@@ -202,7 +207,7 @@ function normalizeKey(raw) {
 /* Validate the key with Google (model list + one tiny generation), then make
  * it active for this process. Never stores an invalid key. */
 async function setApiKey(rawKey, providerName) {
-  const provider = String(providerName || "gemini").toLowerCase();
+  const provider = String(providerName || "openrouter").toLowerCase();
   const def = PROVIDERS[provider];
   if (!def)
     return { ok: false, code: "bad-request", error: "Fournisseur IA inconnu: " + provider };
@@ -514,93 +519,56 @@ function validateFullName(parsed, columns, mappings) {
   return out;
 }
 
-/* ---------------- Google Gemini ---------------- */
+/* ---------------- OpenRouter (OpenAI-compatible) ---------------- */
 
-function isTextGeminiModel(name) {
-  return !/embedding|aqa|imagen|veo|tts|live|vision|banana|image|robotics|transcribe|computer-use|deep-research|lyria|antigravity|omni|native-audio|learnlm/i.test(
-    name,
-  );
+/* Non-text models cannot classify rows: embeddings, image/video/audio,
+ * moderation/rerank/search helpers and "omni" hybrids are dropped. */
+function isTextModel(id) {
+  return !/embedding|image|whisper|tts|speech|moderation|rerank|search|dall-e|diffusion|flux|imagen|clip|audio|video|guard|omni|learnlm/i.test(id);
 }
 
-async function listGeminiModels(key) {
+async function listOpenRouterModels(key) {
   const res = await rawFetch(
-    PROVIDERS.gemini.listUrl +
-      "?key=" +
-      encodeURIComponent(key) +
-      "&pageSize=200",
-    {},
+    PROVIDERS.openrouter.listUrl,
+    { headers: key ? { Authorization: "Bearer " + key } : {} },
     LIST_TIMEOUT_MS,
   );
-  if (!res.ok) return { error: await httpError(res) };
-  const json = await res.json();
-  const models = (json.models || [])
-    .filter(
-      (m) =>
-        Array.isArray(m.supportedGenerationMethods) &&
-        m.supportedGenerationMethods.indexOf("generateContent") !== -1,
-    )
-    .map((m) => String(m.name || "").replace(/^models\//, ""))
-    .filter(Boolean)
-    .filter(isTextGeminiModel);
-  return { models };
-}
-
-/* ---------------- Groq (OpenAI-compatible chat completions) ---------------- */
-
-function isTextGroqModel(name) {
-  /* Groq lists audio (whisper), speech (orpheus/playai/tts), moderation and
-   * vision-only models: they cannot classify text rows, and some need a
-   * terms acceptance that makes every request fail. Only real CHAT text
-   * models are kept. */
-  return !/whisper|tts|guard|distil-whisper|playai|orpheus|prompt-guard|moderation|safety|embed|vision|audio|speech|synthesize|allam/i.test(
-    name,
-  );
-}
-
-async function listGroqModels(key) {
-  const res = await rawFetch(PROVIDERS.groq.listUrl, {
-    headers: { Authorization: "Bearer " + key },
-  }, LIST_TIMEOUT_MS);
   if (!res.ok) return { error: await httpError(res) };
   const json = await res.json();
   const models = (json.data || [])
     .map((m) => String((m && m.id) || ""))
     .filter(Boolean)
-    .filter(isTextGroqModel);
+    .filter(isTextModel);
   return { models };
 }
 
-async function callGroq(model, key, prompt, settings) {
+async function callOpenRouter(model, key, prompt, settings) {
   settings = settings || {};
-  const isSmall = /70b|versatile|120b|large/i.test(model);
-  const res = await rawFetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + key,
+  const res = await rawFetch(
+    PROVIDERS.openrouter.callUrl,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + key,
+      },
+      body: JSON.stringify({
+        model: model,
+        temperature: 0,
+        top_p: 0.1,
+        max_tokens: Math.min(settings.maxOutputTokens || MAX_ANSWER_TOKENS, 8192),
+        messages: [
+          {
+            role: "system",
+            content:
+              "Tu classes des lignes de fichiers clients français. Tu réponds UNIQUEMENT en JSON valide, sans texte autour.",
+          },
+          { role: "user", content: prompt },
+        ],
+      }),
     },
-    body: JSON.stringify({
-      model: model,
-      temperature: 0,
-      top_p: 0.1,
-      max_tokens: Math.min(
-        settings.maxOutputTokens || MAX_ANSWER_TOKENS,
-        /* the small models cap lower; asking for more is rejected */
-        isSmall ? 8000 : 8192,
-      ),
-      /* NO response_format: Groq rejects it (400) unless the word "json" is
-       * in the messages, which cost a failed round-trip and a wrong-model
-       * retry on every batch. The prompt already demands JSON only. */
-      messages: [
-        {
-          role: "system",
-          content:
-            "Tu classes des lignes de fichiers clients français. Tu réponds UNIQUEMENT en JSON valide, sans texte autour.",
-        },
-        { role: "user", content: prompt },
-      ],
-    }),
-  }, settings.timeoutMs || TIMEOUT_MS);
+    settings.timeoutMs || TIMEOUT_MS,
+  );
   if (!res.ok) return { error: await httpError(res) };
   const json = await res.json();
   const choice = (json.choices || [])[0] || {};
@@ -622,57 +590,8 @@ async function callGroq(model, key, prompt, settings) {
   return { text: answer };
 }
 
-async function callGemini(model, key, prompt, settings) {
-  settings = settings || {};
-  const res = await rawFetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/" +
-      encodeURIComponent(model) +
-      ":generateContent?key=" +
-      encodeURIComponent(key),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0,
-          topP: 0.1,
-          candidateCount: 1,
-          responseMimeType: "application/json",
-          maxOutputTokens: settings.maxOutputTokens || MAX_ANSWER_TOKENS,
-        },
-      }),
-    },
-    settings.timeoutMs || TIMEOUT_MS,
-  );
-  if (!res.ok) return { error: await httpError(res) };
-  const json = await res.json();
-  const candidate = (json.candidates || [])[0] || {};
-  const parts = (candidate.content || {}).parts;
-  const answer = Array.isArray(parts)
-    ? parts
-        .filter((p) => !p.thought) // thinking parts are not the answer
-        .map((p) => p.text || "")
-        .join("")
-    : "";
-  if (!answer)
-    return {
-      error: {
-        status: 502,
-        code: candidate.finishReason === "MAX_TOKENS" ? "truncated" : "empty",
-        message:
-          "réponse vide (« " +
-          (candidate.finishReason ||
-            (json.promptFeedback || {}).blockReason ||
-            "aucun contenu") +
-          " »)",
-      },
-    };
-  return { text: answer };
-}
-
 /* ============================================================
- * FULL-SHEET MODE — Gemini reads every row, every cell
+ * FULL-SHEET MODE — the assistant reads every row, every cell
  * ============================================================ */
 
 function buildSheetPrompt(payload) {
@@ -1015,7 +934,7 @@ async function runSheetCall(provider, def, key, payload, candidates, attempts, s
  * body: { provider?, model?, headers:[...], rows:[{i, c:[...]}] }
  * resolves { ok, model, rows:{ i: {target: value} }, placed, missing, invalid, attempts } */
 async function mapRows(body) {
-  const provider = String((body && body.provider) || "gemini").toLowerCase();
+  const provider = String((body && body.provider) || "openrouter").toLowerCase();
   const def = PROVIDERS[provider];
   if (!def)
     return { ok: false, provider, code: "bad-request", error: "Fournisseur IA inconnu: " + provider };
@@ -1293,20 +1212,11 @@ function rankModels(provider, available) {
     if (/flash/.test(low)) s -= 12;
     if (/pro|max|large|ultra|thinking/.test(low)) s += 25; // slow premium
     if (/preview|exp|alpha|beta/.test(low)) s += 40;
-    /* Groq: the "instant" models are the fastest and the most reliable for
-     * strict JSON output; gpt-oss is a solid second. Anything else is a
-     * fallback only. */
-    if (provider === "groq") {
-      /* Measured: gpt-oss-120b takes ~50 s for a 120-row sheet; a "large"
-       * suffix also matched the /large/ rule (+25). The Llama models are an
-       * order of magnitude faster and produce strict JSON. */
-      if (/llama-3\.1-8b-instant/.test(low)) s -= 100;
-      else if (/llama-3\.3-70b-versatile/.test(low)) s -= 80;
-      else if (/gpt-oss-20b/.test(low)) s -= 20;
-      else s += 60;
-    }
+    if (/:free$/.test(low)) s -= 15; // free variants first
+    /* Reasoning models think for a long time before answering: last resort. */
+    if (/(^|[-/])(r1|qwq|o1|o3)([-/]|$)|reasoning/.test(low)) s += 80;
     /* Gemma writes its analysis instead of JSON and ignores JSON mode. */
-    if (/^(gemma|learnlm|gemini-omni)/.test(low)) s += 500;
+    if (/(gemma|learnlm|gemini-omni)/.test(low)) s += 500;
     return s;
   };
   return available
@@ -1356,9 +1266,6 @@ function prewarm() {
 /* Order of the models to try: the model that answered last time first (it
  * works and it is warm), then the ranked free-tier list. */
 function candidateModels(ranked, provider) {
-  /* Groq: SPEED matters most here (the 120b model takes ~50 s per batch).
-   * Always start from the ranked fast model, not from whatever answered last. */
-  if (provider === "groq") return ranked.slice(0, 2);
   const last = LAST_OK.get(provider);
   if (last && last.model && ranked.indexOf(last.model) !== -1) {
     return [last.model].concat(
@@ -1372,7 +1279,7 @@ function candidateModels(ranked, provider) {
  * body: { provider?, columns: [{header, samples[]}], model? }
  * resolves { ok, provider, model, mappings, models, attempts } (never throws). */
 async function mapColumns(body) {
-  const provider = String((body && body.provider) || "gemini").toLowerCase();
+  const provider = String((body && body.provider) || "openrouter").toLowerCase();
   const def = PROVIDERS[provider];
   if (!def)
     return {
@@ -1571,7 +1478,7 @@ async function runMapping(provider, def, key, columns, body, warmup) {
 
 /* Connectivity / key test without touching customer data. */
 async function testProvider(provider) {
-  const p = String(provider || "gemini").toLowerCase();
+  const p = String(provider || "openrouter").toLowerCase();
   const def = PROVIDERS[p];
   if (!def)
     return {

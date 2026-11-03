@@ -21,7 +21,7 @@
     });
   }
 
-  /* Optional online assistant (Gemini / Groq), called directly from the page.
+  /* Optional online assistant (OpenRouter), called directly from the page.
    * The AI client only exists when a key is stored in this browser and the
    * assistant is enabled: without it, everything stays local. */
   function aiAssistant() {
@@ -153,22 +153,22 @@
     var msg = String((scan && scan.message) || '');
     if (code === 'rate') return 'limite de debit gratuite atteinte (nouvelle tentative automatique) — reessayez dans une minute';
     if (code === 'quota') return 'quota gratuit epuise pour aujourd hui';
-    if (code === 'auth') return 'cle Gemini refusee (invalide ou sans acces)';
-    if (code === 'no-key') return 'aucune cle Gemini configuree';
+    if (code === 'auth') return 'cle OpenRouter refusee (invalide ou sans acces)';
+    if (code === 'no-key') return 'aucune cle OpenRouter configuree';
     if (code === 'network') return 'internet injoignable';
     if (code === 'disabled') return 'assistant IA desactive';
     /* Otherwise keep the first sentence, cleaned. */
     var first = msg.split(/\n|\*\s|\.\s{2,}/)[0].replace(/\s+/g, ' ').trim();
-    return first ? first.slice(0, 160) : 'aucune reponse de Gemini';
+    return first ? first.slice(0, 160) : 'aucune reponse de l IA';
   }
 
   function aiFixHint(code) {
     if (code === 'rate') return 'Attendre une minute puis relancer : la limite gratuite est de 15 requetes/minute';
-    if (code === 'quota') return 'Quota gratuit epuise : attendre demain ou activer la facturation Google';
-    if (code === 'auth') return 'Coller une cle Gemini valide puis cliquer « Activer la cle »';
-    if (code === 'no-key') return 'Coller une cle Gemini dans le panneau de l assistant';
+    if (code === 'quota') return 'Quota epuise : attendre demain ou activer la facturation OpenRouter';
+    if (code === 'auth') return 'Coller une cle OpenRouter valide puis cliquer « Activer la cle »';
+    if (code === 'no-key') return 'Coller une cle OpenRouter dans le panneau de l assistant';
     if (code === 'network') return 'Verifier la connexion internet puis reessayer';
-    return 'Verifier la cle Gemini, le quota gratuit et la connexion internet';
+    return 'Verifier la cle OpenRouter, le quota et la connexion internet';
   }
 
   function recordAiOutcome(session) {

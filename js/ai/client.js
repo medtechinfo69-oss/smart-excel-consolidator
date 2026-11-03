@@ -1,9 +1,9 @@
 /* ============================================================
  * Smart Excel - AI assistant client (browser side)
  * ------------------------------------------------------------
- * Google Gemini and Groq are called DIRECTLY from this page (no
- * local server): the key the user pastes lives in this browser
- * only (localStorage) and is sent only to the provider itself.
+ * OpenRouter is called DIRECTLY from this page (no local server):
+ * a ready-to-use key is built in; a key the user pastes lives in
+ * this browser only (localStorage) and is sent only to OpenRouter.
  *
  * Guarantees:
  *  - FULL-SHEET mode (default when the assistant is ticked): the
@@ -24,11 +24,11 @@
   "use strict";
   var SEC = (root.SEC = root.SEC || {});
 
-  var DEFAULT_PROVIDER = "gemini";
+  var DEFAULT_PROVIDER = "openrouter";
   /* The two providers the assistant can use. The choice is made in the
    * interface and travels with every request, so the provider that is
    * SELECTED is always the one that really processes the data. */
-  var PROVIDER_LABELS = { gemini: "Google Gemini", groq: "Groq (Llama)" };
+  var PROVIDER_LABELS = { openrouter: "OpenRouter" };
   var MAX_SAMPLES = 6;
   var SAMPLE_LEN = 60;
   var MAX_COLUMNS = 60; // ambiguous columns per request (cost control)
@@ -60,14 +60,14 @@
     failures: 0,
     skip: {}, // headerNorm -> true (quota: never retried this session)
     /* Full-sheet mode counters (shown in the report and the status line). */
-    sheetRows: 0, // rows actually sent to Gemini
-    sheetPlaced: 0, // rows Gemini classified
-    sheetMissing: 0, // rows Gemini could not answer (kept by the local engine)
+    sheetRows: 0, // rows actually sent to the AI
+    sheetPlaced: 0, // rows the AI classified
+    sheetMissing: 0, // rows the AI could not answer (kept by the local engine)
     sheetCalls: 0, // HTTP requests made in full-sheet mode
     lastSheetError: "",
   };
   var cache = new Map(); // headerNorm -> target key
-  var cacheParts = {}; // headerNorm -> { nom, prenom } (Gemini name split)
+  var cacheParts = {}; // headerNorm -> { nom, prenom } (AI name split)
   /* Is the selected provider usable? (its key is present in this browser) */
   function backendAvailable() {
     if (!state.checked) return true; // optimistic until the status is read
@@ -86,8 +86,8 @@
     if (opts.model !== undefined) state.model = opts.model || "auto";
     if (opts.strict !== undefined) state.strict = !!opts.strict;
     if (opts.provider !== undefined) {
-      var p = String(opts.provider || "gemini").toLowerCase();
-      if (p === "gemini" || p === "groq") state.provider = p;
+      var p = String(opts.provider || "openrouter").toLowerCase();
+      if (p === "openrouter") state.provider = p;
     }
   }
 
@@ -105,7 +105,7 @@
       strict: state.strict,
       usable: usable(),
       provider: state.provider,
-      label: PROVIDER_LABELS[state.provider] || PROVIDER_LABELS.gemini,
+      label: PROVIDER_LABELS[state.provider] || PROVIDER_LABELS.openrouter,
       model: state.model,
       /* The model that really answered the last request (auto mode). */
       usedModel: state.lastModel,
@@ -378,11 +378,11 @@
      * ("Titre client" full of names scores 68 and is not: nothing proves it).
      * The 85+ score is already the proof — the old margin>=20 test compared
      * two proposals derived from the SAME evidence and made almost every
-     * column "certain" (0 destination), so Gemini was never consulted. */
+     * column "certain" (0 destination), so the AI was never consulted. */
     var margin = typeof col.margin === "number" ? col.margin : 100;
     if (col.headerMatched === true && col.score >= 85 && v !== "warn") return false;
     /* A value-proven destination with a clear lead is decided locally.
-     * Otherwise the column keeps its data but needs a real decision (Gemini). */
+     * Otherwise the column keeps its data but needs a real decision (AI). */
     if (col.score >= 72 && margin >= 25 && v !== "warn") return false;
     var r = (col.profile && col.profile.ratios) || {};
     var decisive = DECISIVE_TYPES.some(function (k) {
@@ -404,7 +404,7 @@
     return true;
   }
 
-  /* Consult Gemini for the ambiguous columns of one worksheet.
+  /* Consult the AI for the ambiguous columns of one worksheet.
    * Resolves { headerNorm -> target } (possibly empty) — never rejects. */
   function suggestSheet(fileName, sheetName, columns) {
     if (!enabled()) return Promise.resolve(null);
@@ -489,7 +489,7 @@
           out[k] = target;
           state.mappings++;
         });
-        /* Gemini also tells WHERE the surname and the first name are ("name"
+        /* The AI also tells WHERE the surname and the first name are ("name"
          * columns). Kept apart from the destination hints. */
         Object.keys(res.fullName || {}).forEach(function (header) {
           var k = SEC.Normalizers
@@ -515,7 +515,7 @@
   }
 
   /* ---------------- FULL-SHEET mode ----------------
-   * Gemini reads the REAL text of every row and returns, per line, which
+   * The AI reads the REAL text of every row and returns, per line, which
    * official column each piece belongs to (nom / prenom separated here, not
    * by the header).
    *   headers: array of source header texts (position = source column)
@@ -535,10 +535,9 @@
    * finish faster than the limiter: ONE worker, and a minimum delay between
    * two requests, keeps the batch under the limit instead of triggering
    * 429 "retry in 4s" on every sheet. */
-  /* Gemini's FREE tier allows 15 requests/minute: one request every 4.3 s.
-   * Groq allows far more, so it is not throttled at all (only 2 in flight). */
-  var SHEET_MIN_GAP_MS = 4300;
-  var GROQ_MIN_GAP_MS = 0;
+  /* OpenRouter free models allow tens of requests/minute; a small 600 ms
+   * start gap keeps bursts polite while the retry loop absorbs 429s. */
+  var SHEET_MIN_GAP_MS = 600;
   var sheetNextSlot = 0;
 
   function emptySheetResult() {
@@ -631,7 +630,7 @@
       result.calls++;
       /* Rate pacing: never start a request before its slot (shared across all
        * sheets and files of the run). */
-      var gap = state.provider === "groq" ? GROQ_MIN_GAP_MS : SHEET_MIN_GAP_MS;
+      var gap = SHEET_MIN_GAP_MS;
       var now = Date.now();
       var wait = gap ? Math.max(0, sheetNextSlot - now) : 0;
       if (gap) sheetNextSlot = Math.max(now, sheetNextSlot) + gap;
@@ -652,7 +651,7 @@
             state.lastError = msg;
             if (!firstError) firstError = { code: code, message: msg };
             /* A PER-MINUTE rate limit is transient: the server already waited
-             * for the delay Gemini asked for, so this batch is retried instead
+             * for the delay the provider asked for, so this batch is retried instead
              * of giving up on the sheet (it is what made the last file fall
              * back to the local engine after a "retry in 4.3s"). */
             if (code === "rate" && (result.rateRetries = (result.rateRetries || 0) + 1) <= 2) {
@@ -734,15 +733,15 @@
       return send(batch).then(worker);
     }
     var workers = [];
-    /* TWO batches in flight for both providers: the shared start-slot below
-     * still spaces Gemini starts >= 4.3 s apart (<=14/min < the 15 RPM
-     * free-tier limit), while slow calls overlap -> ~1.6x faster scans. */
-    var maxWorkers = 2;
+    /* THREE batches in flight: the shared 600 ms start slot keeps request
+     * rates sane while slow calls overlap — much faster full-sheet scans. */
+    var maxWorkers = 3;
     for (var w = 0; w < Math.min(maxWorkers, pending.length); w++)
       workers.push(worker());
 
     return Promise.all(workers).then(function () {
       if (!result.rows.length && firstError) {
+        state.sheetMissing += result.missing || 0;
         return {
           __error: true,
           code: firstError.code,
@@ -753,6 +752,10 @@
       }
       /* Some rows unplaced: always reported, never silently replaced. */
       result.error = firstError;
+      /* Accumulate the sheet totals into the RUN totals (the report reads
+       * these — they used to stay at 0). */
+      state.sheetPlaced += result.placed || 0;
+      state.sheetMissing += result.missing || 0;
       return result;
     });
   }
