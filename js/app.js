@@ -15,7 +15,6 @@
    * external template file is loaded anymore. */
   var templateBuffer = null;
   var templateSheet = null;
-  var modalEntryId = null;
   var rafPending = false;
   var lastRefreshTime = 0;
   var REFRESH_MIN_INTERVAL = 300; // ms between UI refreshes during processing
@@ -637,8 +636,6 @@
       fileMap.delete(id);
       refreshAll();
       if (!session.records.size) { $('#previewSection').hidden = true; UI.clearPreview(); $('#validationList').innerHTML = ''; }
-    } else if (action === 'details') {
-      openDetails(id);
     } else if (action === 'show-lines') {
       var entry = session.files.get(id);
       var lines = session.buildLineDetails().filter(function (l) {
@@ -749,70 +746,6 @@
     var p = $('#previewPlaceholder');
     if (p) p.hidden = total > 0;
   }
-
-  /* ---------------- File details modal ---------------- */
-
-  function openDetails(id) {
-    modalEntryId = id;
-    var entry = session.files.get(id);
-    var parseWith = function (buffer) {
-      UI.busy(true, 'Lecture de « ' + entry.name + ' »…', 40);
-      return SEC.WorkerClient.parse(buffer, entry.ext).then(function (res) {
-        renderModal(entry, res.sheets);
-      }).finally(function () { UI.busy(false); });
-    };
-    if (entry._lastBuffer) parseWith(entry._lastBuffer);
-    else readBuffer(entry).then(parseWith).catch(function (err) { UI.toast('Impossible d\'ouvrir le fichier : ' + err.message, 'error'); });
-  }
-
-  function renderModal(entry, sheets) {
-    $('#modalTitle').textContent = 'Fiche du fichier — ' + entry.name;
-    var html = '';
-    if (entry.encoding) html += '<p class="muted">Encodage : <strong>' + UI.escapeHtml(entry.encoding) + '</strong> · Séparateur : <strong>' + UI.escapeHtml(entry.delimiter === '\t' ? 'TAB' : entry.delimiter) + '</strong></p>';
-    sheets.forEach(function (sheet) {
-      var detected = SEC.Agent.detectHeaderRow(sheet.rows).index;
-      var current = entry.headerOverrides[sheet.name];
-      var checked = !entry.selectedSheets || entry.selectedSheets.indexOf(sheet.name) !== -1;
-      html += '<div class="sheet-block">' +
-        '<label class="sheet-check"><input type="checkbox" data-sheet-name="' + UI.escapeHtml(sheet.name) + '" ' + (checked ? 'checked' : '') + (sheet.isEmpty ? ' disabled' : '') + '> ' +
-        '<strong>' + UI.escapeHtml(sheet.name) + '</strong>' + (sheet.isEmpty ? ' <span class="muted">(vide)</span>' : '') + '</label>' +
-        '<label class="field-label">Ligne d\'entête (1 = première ligne ; détectée automatiquement : ' + (detected + 1) + ')</label>' +
-        '<input type="number" min="1" data-header-row="' + UI.escapeHtml(sheet.name) + '" value="' + ((typeof current === 'number') ? current + 1 : detected + 1) + '">' +
-        '</div>';
-    });
-    if (entry.error) html += '<p style="color:var(--red)">Erreur : ' + UI.escapeHtml(entry.error) + '</p>';
-    $('#modalBody').innerHTML = html;
-    $('#modalBackdrop').hidden = false;
-  }
-
-  $('#btnCloseModal').addEventListener('click', closeModal);
-  $('#modalBackdrop').addEventListener('click', function (e) { if (e.target === $('#modalBackdrop')) closeModal(); });
-  function closeModal() { $('#modalBackdrop').hidden = true; modalEntryId = null; }
-
-  $('#btnSaveModal').addEventListener('click', function () {
-    var entry = session.files.get(modalEntryId);
-    if (!entry) return closeModal();
-    var selected = UI.$all('[data-sheet-name]').filter(function (c) { return c.checked; }).map(function (c) { return c.getAttribute('data-sheet-name'); });
-    if (!selected.length) { UI.toast('Sélectionnez au moins une feuille', 'warning'); return; }
-    entry.selectedSheets = selected;
-    entry._sheetsChosen = true;
-    UI.$all('[data-header-row]').forEach(function (inp) {
-      var name = inp.getAttribute('data-header-row');
-      var v = parseInt(inp.value, 10);
-      if (v >= 1) entry.headerOverrides[name] = v - 1;
-    });
-    closeModal();
-    if (session.running) { UI.toast('Les modifications s\'appliqueront après la fin du lot en cours', 'warning'); return; }
-    entry.status = 'waiting';
-    session.reprocessAffected([entry.id], readBuffer, yieldToUI).then(function () {
-      scheduleRefresh(); renderCurrentPreview();
-      updateControls();
-      UI.toast('Fichier retraité avec vos réglages de feuilles/entêtes', 'success');
-    }).catch(function (err) {
-      updateControls();
-      UI.toast('Échec du retraitement : ' + err.message, 'error');
-    });
-  });
 
   /* ---------------- Correction manuelle / À valider ----------------
    * Every value the assistant could not classify with certainty is listed

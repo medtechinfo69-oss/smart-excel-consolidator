@@ -138,9 +138,6 @@
       rows +
       "</button></td>" +
       '<td class="actions-cell">' +
-      '<button class="link-btn" data-action="details" data-id="' +
-      entry.id +
-      '" title="Voir / corriger les feuilles et la ligne d entête">Fiche du fichier</button> ' +
       '<button class="link-btn danger" data-action="remove" data-id="' +
       entry.id +
       '"' +

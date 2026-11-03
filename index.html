@@ -331,11 +331,6 @@
                 <th>Statut</th>
                 <th>Progression</th>
               <th>Lignes ajoutées</th>
-                <th
-                  title="Voir / corriger les colonnes détectées et la ligne d'entête de ce fichier"
-                >
-                  Fiche du fichier
-                </th>
               </tr>
             </thead>
             <tbody id="processTableBody"></tbody>
@@ -483,29 +478,6 @@
         </p>
       </footer>
     </main>
-
-    <!-- Fenêtre de détail d'un fichier (choix des feuilles + ligne d'entête) -->
-    <div class="modal-backdrop" id="modalBackdrop" hidden>
-      <div
-        class="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modalTitle"
-      >
-        <div class="modal-head">
-          <h3 id="modalTitle">Fiche du fichier</h3>
-          <button class="icon-btn" id="btnCloseModal" aria-label="Fermer">
-            &times;
-          </button>
-        </div>
-        <div class="modal-body" id="modalBody"></div>
-        <div class="modal-foot">
-          <button class="btn btn-primary btn-sm" id="btnSaveModal">
-            Enregistrer &amp; retraiter le fichier
-          </button>
-        </div>
-      </div>
-    </div>
 
     <!-- Indicateur d'activité (analyse d'un classeur, export) : non bloquant -->
     <div class="busy-overlay" id="busyOverlay" hidden aria-live="polite">
