@@ -526,8 +526,10 @@
 
   /* 180 rows per request: big enough to stay fast, small enough that the JSON
    * answer is never truncated (a truncated answer costs a retry). */
-  /* 60 rows per request: answers in a few seconds and is never truncated. */
-  var SHEET_ROWS_PER_CALL = 60;
+  /* 100 rows per request: a full sheet needs fewer round-trips, and the
+   * answer stays far below the truncation limit (a truncated answer is
+   * detected and the batch is re-sent in smaller pieces). */
+  var SHEET_ROWS_PER_CALL = 100;
   var SHEET_MAX_CELLS = 40; // wider sheets are cut: 11 official columns exist
   var SHEET_CELL_LEN = 300;
   var SHEET_TIMEOUT_MS = 120000;
@@ -537,7 +539,7 @@
    * 429 "retry in 4s" on every sheet. */
   /* OpenRouter free models allow tens of requests/minute; a small 600 ms
    * start gap keeps bursts polite while the retry loop absorbs 429s. */
-  var SHEET_MIN_GAP_MS = 600;
+  var SHEET_MIN_GAP_MS = 400;
   var sheetNextSlot = 0;
 
   function emptySheetResult() {
@@ -733,9 +735,9 @@
       return send(batch).then(worker);
     }
     var workers = [];
-    /* THREE batches in flight: the shared 600 ms start slot keeps request
+    /* FOUR batches in flight: the shared 400 ms start slot keeps request
      * rates sane while slow calls overlap — much faster full-sheet scans. */
-    var maxWorkers = 3;
+    var maxWorkers = 4;
     for (var w = 0; w < Math.min(maxWorkers, pending.length); w++)
       workers.push(worker());
 

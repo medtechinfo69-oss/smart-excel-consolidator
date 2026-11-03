@@ -44,11 +44,15 @@
   function rowWordSet(cells) {
     var set = {};
     (cells || []).forEach(function (c) {
-      String(c == null ? '' : c)
+      /* An EMPTY cell holds no word: `.match()` returns null, and reading
+       * `.forEach` on it crashed the whole FILE (0 lines imported). Real
+       * files are full of empty cells — they must simply be ignored. */
+      var words = String(c == null ? '' : c)
         .replace(/\u00a0/g, ' ')
         .toLowerCase()
-        .match(/[0-9a-z\u00e0-\u00f6\u00f8-\u00ff]+/g)
-        .forEach(function (w) { set[w] = true; });
+        .match(/[0-9a-z\u00e0-\u00f6\u00f8-\u00ff]+/g);
+      if (!words) return;
+      words.forEach(function (w) { set[w] = true; });
     });
     return set;
   }
@@ -772,6 +776,97 @@
       }
     }
 
+    /* ---------- PACKED CELLS: « Le Creusot | 0385561532 » ----------
+     * One source cell often holds several fields glued with a pipe. Each
+     * piece is typed and written to ITS OWN column instead of dumping the
+     * whole string into a single destination: a city goes to « Ville », a
+     * number to « Téléphone », an insurer to « Mutuelle », a price to
+     * « Cotisation »… A piece that is really a note stays in « Commentaire »,
+     * so nothing is ever lost. */
+
+    /* Which column this piece belongs to, from its TYPE alone (fast: no
+     * dictionary scan except for insurers / known cities). */
+    function pieceDestination(piece, values) {
+      var t = N.trimClean(piece);
+      if (!t || (N.isPlaceholder && N.isPlaceholder(t))) return null;
+      if (N.looksLikeEmail(t)) return 'email';
+      /* A phone number carries NO letter: a note such as
+       * « FILE3 ROW5 DIRTY Rappel 30/04/2024 » holds 10 digits (and even
+       * starts with a 3, which the Swiss/Belgium prefix rule rebuilds into a
+       * plausible number) — it is a note, never a phone number. */
+      if (!/[a-zA-Z\u00c0-\u00ff]/.test(t) && N.looksLikePhone(t) &&
+          !(N.isUnusablePhone && N.isUnusablePhone(t))) {
+        if (!values.tel1) return 'tel1';
+        if (!values.tel2) return 'tel2';
+        return null;               /* 3rd number: left where it is (a note) */
+      }
+      if (N.looksLikePostal(t)) return 'cp';
+      if (N.isPureInsurer && N.isPureInsurer(t)) return 'mutuelle';
+      /* Only a CONFIRMED price (currency or decimals) leaves a note: a bare
+       * « 70 » may be an age and stays where it is. */
+      if (N.isConfirmedAmount && N.isConfirmedAmount(t)) return 'cotisation';
+      if (SEC.Communes && SEC.Communes.count && SEC.Communes.count() &&
+          SEC.Communes.isKnownCity(t)) return 'ville';
+      return null;
+    }
+
+    /* The piece written in its own column, with the formatting of that
+     * column (grouped digits for a phone, official name for a city, …). */
+    function formatPiece(dest, piece, values) {
+      var t = N.trimClean(piece);
+      if (dest === 'tel1' || dest === 'tel2') {
+        var an = N.analyzePhone(t);
+        return (an && an.value) || t;
+      }
+      if (dest === 'mutuelle') return N.matchInsurer(t) || t;
+      if (dest === 'ville') {
+        var res = SEC.Communes && SEC.Communes.validate ? SEC.Communes.validate(t, values.cp || '') : null;
+        if (res && (res.status === 'ok' || res.status === 'corrected') && res.value) return res.value;
+        return t;
+      }
+      if (dest === 'cotisation') return N.extractAmount ? (N.extractAmount(t) || t) : t;
+      return t;
+    }
+
+    /* Split every destination value holding « a | b » and move each piece to
+     * the column its type belongs to. Returns true when something moved. */
+    function redistributePackedValues(values) {
+      var hasPipe = false;
+      SEC.TARGET_KEYS.forEach(function (k) {
+        if (values[k] && String(values[k]).indexOf('|') !== -1) hasPipe = true;
+      });
+      if (!hasPipe) return false;
+      var moved = false;
+      SEC.TARGET_KEYS.forEach(function (key) {
+        var raw = String(values[key] || '');
+        if (raw.indexOf('|') === -1) return;
+        var pieces = raw.split(/\s*\|\s*/);
+        if (pieces.length < 2) return;
+        var keep = [];
+        pieces.forEach(function (p) {
+          var t = N.trimClean(p);
+          if (!t) return;
+          var dest = pieceDestination(t, values);
+          if (!dest) { keep.push(t); return; }               /* a note */
+          if (dest === key) { keep.push(t); return; }        /* already home */
+          /* Several numbers in a phone column stay in order: Téléphone 1 then
+           * Téléphone 2 (the phone splitter below separates them). */
+          if ((key === 'tel1' || key === 'tel2') && (dest === 'tel1' || dest === 'tel2')) { keep.push(t); return; }
+          /* A typed destination only keeps its own type: a phone sitting in
+           * « Ville » never stays there, even when both phones are taken. */
+          if (values[dest] && !(TYPED_SLOTS[key] && TYPED_SLOTS[key](t))) { keep.push(t); return; }
+          if (values[dest]) {
+            values.commentaire = values.commentaire ? values.commentaire + ' | ' + formatPiece(dest, t, values) : formatPiece(dest, t, values);
+          } else {
+            values[dest] = formatPiece(dest, t, values);
+          }
+          moved = true;
+        });
+        values[key] = keep.join(' | ');
+      });
+      return moved;
+    }
+
     /* City validation against the official commune database.
      * - identified with certainty -> official INSEE name (accents, spacing)
      * - not identified -> Ville left EMPTY, the raw text is reported
@@ -1235,6 +1330,11 @@
 
           if (usedCommentParts.length) values.commentaire = usedCommentParts.join(' | ');
 
+          /* 0.bis A cell holding « Le Creusot | 0385561532 » is NOT one value:
+           * each piece goes to the column its type belongs to, before any
+           * other treatment (local or assistant). */
+          redistributePackedValues(values);
+
           /* 0bis. Gemini read this line: it takes over the placement (every
            * source word is placed exactly once, Nom / Prénom are separated by
            * Gemini itself). An answer that does not rebuild the source text is
@@ -1266,23 +1366,41 @@
                 SEC.TARGET_KEYS.forEach(function (key) {
                   if (typeof aiValues[key] === 'string') values[key] = aiValues[key];
                 });
-                /* A typed destination keeps only its own type, even when the
-                 * assistant wrote it: a text in « Téléphone 1 », a city in
-                 * « Mutuelle » or a date in « Cotisation » is moved back to
-                 * « Commentaire » right away, so the local reading of that
-                 * same slot (rescued just below) is kept instead of being
-                 * dropped. This is what corrupted Téléphone / Mutuelle /
-                 * Cotisation on the rows the assistant got wrong. */
+                /* What the assistant wrote is vetted value by value:
+                 *  1. a piece that CLEARLY belongs to another free column
+                 *     (an e-mail read as a first name, a city read as a
+                 *     surname, a phone read as a note…) goes to that column;
+                 *  2. a piece whose type contradicts its destination (a text
+                 *     in « Téléphone 1 », a city in « Mutuelle », a date in
+                 *     « Cotisation ») goes back to « Commentaire »;
+                 *  3. everything else stays where the assistant put it.
+                 * The local reading of a slot left empty is rescued just
+                 * below, so nothing the engine had right is ever dropped. */
                 SEC.TARGET_KEYS.forEach(function (key) {
                   if (key === 'commentaire' || !values[key]) return;
-                  if (!TYPED_SLOTS[key]) return;
                   var segs = String(values[key]).split(/\s*\|\s*/);
                   var keep = [];
                   segs.forEach(function (seg) {
                     var s = N.trimClean(seg);
                     if (!s) return;
-                    if (!TYPED_SLOTS[key](s)) { keep.push(s); return; }
-                    values.commentaire = values.commentaire ? (values.commentaire + ' | ' + s) : s;
+                    var dest = pieceDestination(s, values);
+                    /* A city is only moved to « Ville » when the local engine
+                     * read it as a city too: a surname that is also a commune
+                     * (« Martin », « Paris ») stays a name. */
+                    if (dest === 'ville' && !(localBefore.ville && sameLoose(localBefore.ville, s))) dest = null;
+                    /* Two numbers in the phone slots keep their order:
+                     * « 06 11 … | 06 55 … » is Téléphone 1 then Téléphone 2,
+                     * never the other way round. */
+                    if ((key === 'tel1' || key === 'tel2') && (dest === 'tel1' || dest === 'tel2')) dest = null;
+                    if (dest && dest !== key && !values[dest]) {
+                      values[dest] = formatPiece(dest, s, values);
+                      return;
+                    }
+                    if (TYPED_SLOTS[key] && TYPED_SLOTS[key](s)) {
+                      values.commentaire = values.commentaire ? (values.commentaire + ' | ' + s) : s;
+                      return;
+                    }
+                    keep.push(s);
                   });
                   values[key] = keep.join(' | ');
                 });
@@ -1317,6 +1435,23 @@
                       .join(' | ');
                   }
                 });
+                /* The assistant used the name for something else (a city, a
+                 * note) and left « Nom » empty: the name is still in
+                 * « Commentaire » — it is restored instead of being lost. */
+                if (!values.nom && !values.prenom && values.commentaire) {
+                  var restName = [];
+                  values.commentaire.split(/\s*\|\s*/).forEach(function (piece) {
+                    var t = N.trimClean(piece);
+                    if (!t) return;
+                    if (!values.nom && N.looksLikePersonName(t) && !N.isNoteLike(t) &&
+                        !N.looksLikeAmount(t) && !pieceDestination(t, values)) {
+                      values.nom = t;
+                      return;
+                    }
+                    restName.push(t);
+                  });
+                  if (values.nom) values.commentaire = restName.join(' | ');
+                }
                 aiPlaced = true;
                 /* The « À valider » items are built AFTER the type checks
                  * (below): the row is first cleaned, so a value the app has
@@ -1340,6 +1475,10 @@
           /* 0. Destination columns keep only their own type — whatever
            * wrote the value (local engine or the assistant). */
           enforceDestinationTypes(values);
+          /* Same split AFTER the type check: a piece the type check pushed
+           * back to « Commentaire » still goes to its own column when that
+           * column is free (the note keeps only what is really a note). */
+          redistributePackedValues(values);
 
           /* What the assistant could not identify is proposed for validation
            * ONLY now, from the CLEANED row: a piece that already sits in its
@@ -2445,9 +2584,13 @@
           v[slot] = '';
           moved++;
         });
-        /* 4. A person name inside « Ville » or « Adresse » is a person name. */
+        /* 4. A person name inside « Ville » or « Adresse » is a person name.
+         * A KNOWN CITY (« Le Creusot », « Le Mans ») looks like a name because
+         * it carries an article — it is a city and stays in « Ville ». */
         ['ville', 'adresse'].forEach(function (slot) {
           if (!v[slot] || !N.looksLikePersonName(v[slot]) || N.isNoteLike(v[slot])) return;
+          if (SEC.Communes && SEC.Communes.count && SEC.Communes.count() &&
+              SEC.Communes.isKnownCity(N.trimClean(v[slot]))) return;
           if (!v.nom && !v.prenom) {
             var split = N.splitNamePair(v[slot]);
             v.nom = split && split.nom ? split.nom : v[slot];
