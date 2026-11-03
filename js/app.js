@@ -193,7 +193,7 @@
 
 
 
-  /* ---------------- Optional AI assistant (Gemini / Groq) ---------------
+  /* ---------------- Optional AI assistant (OpenRouter) -----------------
    * The provider is called DIRECTLY from this page. The API key the user
    * pastes is stored in this browser only (localStorage) and sent only to
    * the provider itself. Without a key the assistant reports itself
@@ -224,7 +224,7 @@
   }
 
   function providerLabel() {
-    return AI.PROVIDER_LABELS[AI.status().provider] || 'Google Gemini';
+    return AI.PROVIDER_LABELS[AI.status().provider] || 'OpenRouter';
   }
 
   function updateAiStatus() {
@@ -240,11 +240,11 @@
       /* The box is clear: nothing is sent to Gemini for the next batch. */
       if (retry) retry.hidden = true;
       if (keyHint) keyHint.hidden = true;
-      setAiStatus('Désactivé — traitement 100 % local, aucun appel à Gemini');
+      setAiStatus('Désactivé — traitement 100 % local, aucun appel à l IA');
       return;
     }
     if (st.stopped) {
-      if (box) box.checked = true; // still ticked, but Gemini failed
+      if (box) box.checked = true; // still ticked, but the AI failed
       setAiStatus(st.label + ' : ' + (st.lastError || 'indisponible') + ' — les lignes non classées sont traitées par le moteur local', 'warn');
       if (retry) retry.hidden = false;
       return;
@@ -309,13 +309,13 @@
     if (!input || keyBusy) return;
     var value = String(input.value || '').trim();
     if (!value) {
-      UI.toast('Collez votre clé Gemini avant de l\'activer', 'warning');
+      UI.toast('Collez votre clé OpenRouter avant de l\'activer', 'warning');
       input.focus();
       return;
     }
     keyBusy = true;
     if (btn) { btn.disabled = true; btn.textContent = 'Vérification…'; }
-    setAiStatus('Vérification de la clé auprès de Google…');
+    setAiStatus('Vérification de la clé auprès de OpenRouter…');
     AI.setKey(value).then(function (res) {
       keyBusy = false;
       if (btn) { btn.disabled = false; btn.textContent = 'Activer la clé'; }
@@ -330,7 +330,7 @@
           return;
         }
         setAiStatus('Clé refusée : ' + msg + ' — traitement local actif', 'err');
-        UI.toast('Clé Gemini refusée : ' + msg, 'error');
+        UI.toast('Clé OpenRouter refusée : ' + msg, 'error');
         return;
       }
       /* Activated: turn the assistant on and prove it answers. */
@@ -346,7 +346,7 @@
       if (hint) hint.hidden = true;
       fillModelSelect(res.models || [], res.model);
       setAiStatus(providerLabel() + ' connecté (' + (res.model || 'auto') + ') — analyse de toutes les lignes', 'ok');
-      UI.toast('Clé Gemini activée' + (res.model ? ' (' + res.model + ')' : ''), 'success');
+      UI.toast('Clé OpenRouter activée' + (res.model ? ' (' + res.model + ')' : ''), 'success');
     });
   }
   /* The key input only appears when the assistant is ticked AND has no usable
@@ -432,10 +432,10 @@
   }
 
   /* Provider selector: the chosen provider is the one that processes the
-   * data (Gemini or Groq). Switching reloads its key state and models. */
+   * data (OpenRouter). Switching reloads its key state and models. */
   function currentProvider() {
     var sel = $('#aiProvider');
-    return (sel && sel.value) || 'gemini';
+    return (sel && sel.value) || 'openrouter';
   }
 
   function applyProvider(provider, silent) {
@@ -444,14 +444,12 @@
     var keyLabel = $('#aiKeyLabel');
     var keyInput = $('#aiKeyInput');
     var modelSel = $('#aiModel');
-    if (keyLabel) keyLabel.textContent = provider === 'groq' ? 'Clé API Groq (gsk…)' : 'Clé API Google Gemini (AIza…)';
-    if (keyInput) keyInput.placeholder = provider === 'groq' ? 'Collez ici votre clé Groq (gsk…)' : 'Collez ici votre clé Gemini (AIza…)';
+    if (keyLabel) keyLabel.textContent = 'Clé API OpenRouter (sk-or-v1-…)';
+    if (keyInput) keyInput.placeholder = 'Collez ici votre clé OpenRouter (sk-or-v1-…) — facultative, une clé est déjà incluse';
     if (keyInput) keyInput.setAttribute('data-provider', provider);
-    // Show the right hint
-    var hGemini = $('#aiKeyHintGemini');
-    var hGroq = $('#aiKeyHintGroq');
-    if (hGemini) hGemini.hidden = provider === 'groq';
-    if (hGroq) hGroq.hidden = provider !== 'groq';
+    // Show the OpenRouter hint
+    var hOr = $('#aiKeyHintOpenRouter');
+    if (hOr) hOr.hidden = false;
     if (modelSel) {
       modelSel.innerHTML = '<option value="auto">Automatique — meilleur modèle disponible</option>';
       modelSel.value = 'auto';
@@ -505,14 +503,14 @@
           checkAiConnection(true);
         }
       });
-      UI.toast('Assistant IA Gemini activé : toutes les lignes seront auditées par Gemini', 'success');
+      UI.toast('Assistant IA OpenRouter activé : toutes les lignes seront analysées par l IA', 'success');
     } else {
       setAiKeyRowVisible(false);
       if (hint) hint.hidden = true;
       aiCheckSeq++;
       /* Disabled means: no request at all for the next batch. */
-      setAiStatus('Désactivé — traitement 100 % local, aucun appel à Gemini');
-      UI.toast('Assistant IA Gemini désactivé : traitement et export 100 % locaux', 'info');
+      setAiStatus('Désactivé — traitement 100 % local, aucun appel à l IA');
+      UI.toast('Assistant IA désactivé : traitement et export 100 % locaux', 'info');
     }
   });
   /* The chosen model is used FROM NOW ON, exactly as selected. */
@@ -542,7 +540,7 @@
     /* A failure disables the assistant, so `enabled` is false exactly when a
      * report line matters most: the tick is the right test here. */
     if (!st.enabled && !st.ticked) return;
-    /* Full-sheet mode: how many source lines Gemini really classified. */
+    /* Full-sheet mode: how many source lines the AI really classified. */
     if (st.sheetRows || st.sheetMissing) {
       var missing = st.sheetMissing || 0;
       session.addReport({
@@ -556,7 +554,7 @@
           : 'Toutes les lignes ont été classées par l assistant IA',
         severity: missing ? 'warning' : 'info'
       });
-      if (missing) UI.toast(missing + ' ligne(s) n ont pas pu être classées par Gemini — traitées par le moteur local (voir le rapport)', 'warning');
+      if (missing) UI.toast(missing + ' ligne(s) n ont pas pu être classées par l IA — traitées par le moteur local (voir le rapport)', 'warning');
       return;
     }
     if (!session.aiRequests && !st.mappings) return;

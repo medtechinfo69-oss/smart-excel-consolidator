@@ -101,7 +101,7 @@
           </div>
         </div>
 
-        <!-- ASSISTANT IA : Google Gemini ou Groq, appel direct, clé stockée dans le navigateur -->
+        <!-- ASSISTANT IA : OpenRouter, appel direct, clé stockée dans le navigateur -->
         <div class="ai-panel" id="aiPanel">
           <label class="ai-toggle">
             <input type="checkbox" id="aiEnabled" checked />
@@ -121,8 +121,7 @@
           <div class="ai-provider-row">
             <label class="field-label" for="aiProvider">Fournisseur IA</label>
             <select id="aiProvider">
-              <option value="gemini" selected>Google Gemini</option>
-              <option value="groq">Groq (Llama)</option>
+              <option value="openrouter" selected>OpenRouter</option>
             </select>
             <label class="ai-strict" title="Aucune ligne n'est classée par le moteur local quand le fournisseur peut le faire">
               <input type="checkbox" id="aiStrict" checked />
@@ -150,14 +149,14 @@
             </div>
           </div>
           <div class="ai-key" id="aiKeyBox">
-            <label class="field-label" for="aiKeyInput" id="aiKeyLabel">Clé API Google Gemini</label>
+            <label class="field-label" for="aiKeyInput" id="aiKeyLabel">Clé API OpenRouter</label>
             <div class="ai-key-row">
               <input
                 type="password"
                 id="aiKeyInput"
-                placeholder="Collez ici votre clé Gemini (AIza…)"
+                placeholder="Facultative — une clé est déjà incluse (sk-or-v1-…)"
                 autocomplete="off"
-                spellcheck="false" data-provider="gemini"
+                spellcheck="false" data-provider="openrouter"
               />
               <button class="btn btn-primary btn-sm" id="btnAiKey" type="button">
                 Activer la clé
@@ -166,17 +165,12 @@
                 Afficher
               </button>
             </div>
-            <p class="muted small ai-hint" id="aiKeyHintGemini">
-              Clé gratuite : <code>aistudio.google.com/apikey</code>. Elle est
-              envoyée uniquement à Google, vérifiée auprès de Google, puis
-              enregistrée dans ce navigateur (localStorage) pour les prochaines
-              ouvertures — jamais sur un autre site.
-            </p>
-            <p class="muted small ai-hint" id="aiKeyHintGroq" hidden>
-              Clé gratuite : <code>console.groq.com</code>. Elle est envoyée
-              uniquement à Groq, vérifiée auprès de Groq, puis enregistrée dans
-              ce navigateur (localStorage) pour les prochaines ouvertures —
-              jamais sur un autre site.
+            <p class="muted small ai-hint" id="aiKeyHintOpenRouter">
+              Une clé OpenRouter est déjà incluse : l'assistant fonctionne
+              immédiatement. Pour utiliser la vôtre
+              (<code>openrouter.ai/keys</code>), collez-la ci-dessus — elle est
+              envoyée uniquement à OpenRouter et enregistrée dans ce navigateur
+              (localStorage) pour les prochaines ouvertures.
             </p>
           </div>
           <p class="muted small ai-hint" id="aiKeyHint" hidden>
@@ -484,7 +478,7 @@
           Smart Excel fonctionne entièrement dans votre navigateur
           avec des bibliothèques locales. Aucune base de données, aucun fichier
           conservé : quand l'assistant IA est coché, le texte des lignes est
-          envoyé directement à Google Gemini ou Groq pour être classé ; décoché,
+          envoyé directement à OpenRouter pour être classé ; décoché,
           les fichiers ne quittent jamais votre ordinateur.
         </p>
       </footer>

@@ -5,8 +5,8 @@ French CSV and XLSX customer/health-insurance files into **one standardized Exce
 built around the 11 official French headers.
 
 > No database, no login, no upload, **no server to install**. Every byte is processed in your
-> browser. An optional **Google Gemini / Groq** assistant (your own API key, kept in your
-> browser) helps classify ambiguous columns and read every row; without it everything keeps
+> browser. An optional **OpenRouter** assistant (a working key is included; bring your own
+> if you prefer) classifies every row and fills the right columns; without it everything keeps
 > working 100% locally.
 
 ---
@@ -28,13 +28,13 @@ built around the 11 official French headers.
 The page can also be opened with *Right click → Open with → your browser*.
 It works offline: airplane mode is fine (the optional AI assistant is simply skipped).
 
-**Optional AI assistant (Google Gemini or Groq).** Paste your free API key
-(Gemini: https://aistudio.google.com/apikey — Groq: https://console.groq.com)
-into the assistant panel and click **Activer la clé**. The key is validated directly
-with the provider, then stored **in your browser only** (`localStorage`) so it is
-reused on the next opening; it is sent only to the provider itself, never anywhere
-else. The free-tier model is picked automatically. If the key is missing, the quota
-is exhausted or the network is down, the local engine finishes the job.
+**Optional AI assistant (OpenRouter — Gemini, Llama, Mistral, Qwen and more).**
+A working OpenRouter key is **already included**: just tick the assistant and
+process your files. To use your own key (https://openrouter.ai/keys), paste it
+into the assistant panel and click **Activer la clé**. The key is stored **in your
+browser only** (`localStorage`) and is sent only to OpenRouter. The fastest
+available model is picked automatically. If the key is missing, the quota is
+exhausted or the network is down, the local engine finishes the job.
 
 ---
 
@@ -155,7 +155,7 @@ assistant only re-checks the columns this engine could not decide:
 ## 5. Privacy & security
 
 - All processing is in-memory, in the browser tab. The only network calls are the optional
-  AI requests sent **directly from your browser to Google Gemini or Groq** when the assistant
+  AI requests sent **directly from your browser to OpenRouter** when the assistant
   is ticked; no CDN, no analytics, and no customer data is ever sent anywhere else — only
   headers, a handful of sample values per ambiguous column, and (in full-sheet mode) the row
   texts being classified.
@@ -196,7 +196,7 @@ smart-excel-consolidator/
 │   ├── ui.js                  # DOM rendering
 │   ├── worker-client.js       # Parsing/export engine (main thread)
 │   ├── ai/
-│   │   ├── providers.js       # Direct Gemini/Groq calls (model ranking, prompts, validation)
+│   │   ├── providers.js       # Direct OpenRouter calls (model ranking, prompts, validation)
 │   │   └── client.js          # Assistant state machine (full-sheet mode, retries, cache)
 │   └── app.js                 # Controller and event wiring
 └── vendor/
