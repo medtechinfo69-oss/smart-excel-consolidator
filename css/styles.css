@@ -216,6 +216,10 @@ body {
 .data-table td { padding: 9px 12px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tbody tr:hover { background: #f8fafc; }
+/* The « Retirer » column: stable width, right aligned, never wraps. */
+.data-table th.col-actions { width: 110px; text-align: right; white-space: nowrap; }
+.data-table td.actions-cell { width: 110px; text-align: right; white-space: nowrap; }
+.data-table td.actions-cell .link-btn { margin-left: 4px; }
 .totals-row td {
   background: var(--gray-100);
   border-top: 2px solid var(--gray-300);

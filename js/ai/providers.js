@@ -126,8 +126,11 @@ const SHEET_CALL_TOKENS = 16384;
 const SHEET_CONCURRENCY = 2;
 /* A per-MINUTE rate limit is TRANSIENT: wait for the delay the provider
  * asks for and retry, instead of abandoning the whole sheet. */
-const SHEET_RATE_RETRIES = 5;
-const SHEET_RATE_MAX_WAIT_MS = 20000;
+/* A blocked / rate-limited key must not freeze the batch: two short waits
+ * (6 s max each) and the call is given up — the local engine finishes the
+ * sheet instead of making the user wait two minutes per request. */
+const SHEET_RATE_RETRIES = 2;
+const SHEET_RATE_MAX_WAIT_MS = 6000;
 /* A batch that fails on a transient error is retried and then SPLIT in half:
  * a lost batch is never reported as "thousands of unclassified lines". */
 const SHEET_JOB_RETRIES = 2;
@@ -218,7 +221,13 @@ async function setApiKey(rawKey, providerName) {
   RUNTIME_KEYS[provider] = key;
   MAINTENANCE_KEY = "";
   clearCache(true);
-  const listed = await getModels(provider, key, true);
+  let listed = await getModels(provider, key, true);
+  /* A NETWORK blip must never reject a valid key: one short retry. An
+   * "auth" answer is real (the key is refused) and is not retried. */
+  if (listed.error && listed.error.code === "network") {
+    await sleep(1200);
+    listed = await getModels(provider, key, true);
+  }
   if (listed.error) {
     if (previous) RUNTIME_KEYS[provider] = previous;
     else delete RUNTIME_KEYS[provider];
@@ -1043,12 +1052,18 @@ async function mapRows(body) {
       return runJob(rows, depth + 1);
     }
     if (out.error) {
+      /* A rate limit or a key / quota problem is NEVER fixed by sending MORE
+       * (smaller) requests: splitting a 100-row batch into 1-row calls turned
+       * a blocked key into dozens of extra calls, each waiting for the next
+       * retry window (two minutes lost on a six-file batch). Those codes stop
+       * here; only a size / payload problem is worth splitting. */
+      const fatalCode = ["rate", "quota", "auth", "no-key", "forbidden"].indexOf(out.error.code) !== -1;
       /* Still failing: SPLIT the batch and retry the halves. A smaller request
        * succeeds for every size / timeout / JSON-length problem, and a
        * "bad-request" (payload refused, model quirk) is exactly that. The old
        * code treated bad-request as fatal and dropped every remaining row of
        * the sheet — 882 of 1 000 lines lost in one batch. */
-      if (rows.length > 1 && depth < SHEET_JOB_RETRIES + 3) {
+      if (!fatalCode && rows.length > 1 && depth < SHEET_JOB_RETRIES + 3) {
         const mid = Math.ceil(rows.length / 2);
         await runJob(rows.slice(0, mid), depth + 1);
         await runJob(rows.slice(mid), depth + 1);

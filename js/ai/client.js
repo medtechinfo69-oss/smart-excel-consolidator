@@ -656,9 +656,9 @@
              * for the delay the provider asked for, so this batch is retried instead
              * of giving up on the sheet (it is what made the last file fall
              * back to the local engine after a "retry in 4.3s"). */
-            if (code === "rate" && (result.rateRetries = (result.rateRetries || 0) + 1) <= 2) {
+            if (code === "rate" && (result.rateRetries = (result.rateRetries || 0) + 1) <= 1) {
               state.failures--; // not a real failure yet
-              return sleepMs(1500 * result.rateRetries).then(function () { return send(batch); });
+              return sleepMs(1200).then(function () { return send(batch); });
             }
             /* NETWORK / timeout: retry the same batch a few times. A single
              * aborted request must never mark hundreds of lines as
@@ -673,10 +673,14 @@
             reportProgress();
             /* Daily quota / key / server: every further call is pointless. */
             if (
-              ["quota", "auth", "no-key", "network", "bad-request", "forbidden"].indexOf(code) !== -1
+              ["quota", "rate", "auth", "no-key", "network", "bad-request", "forbidden"].indexOf(code) !== -1
             ) {
               if (code !== "bad-request") state.stopped = true;
               if (code === "network") state.reachable = false;
+              /* A rate-limited key stays rate-limited for the whole minute:
+               * every further call would only wait again. The remaining
+               * batches go to the local engine, whose result is complete. */
+              if (code === "rate") state.stopped = true;
             }
             return;
           }
