@@ -815,6 +815,36 @@ function validateSheetRows(parsed, payload) {
         delete values[key];
       }
     });
+    /* HARD RULES on destination types (same policy as the processor): a
+     * phone slot never carries text/dates, Mutuelle never carries junk and
+     * Cotisation never carries a date. Nothing is dropped — bad values move
+     * to « Commentaire ». */
+    ["tel1", "tel2"].forEach((key) => {
+      if (!values[key]) return;
+      const NN = root.SEC && root.SEC.Normalizers;
+      const segs = String(values[key]).split(/\s*\|\s*/).filter(Boolean);
+      const ok = [];
+      segs.forEach((seg) => {
+        const digits = seg.replace(/\D/g, "");
+        const looksPhone = NN
+          ? NN.looksLikePhone(seg) && !(NN.isUnusablePhone && NN.isUnusablePhone(seg))
+          : /^\+?[\d\s.\-()]{9,}$/.test(seg) && digits.length >= 9 && digits.length <= 15;
+        if (looksPhone) ok.push(seg);
+        else
+          values.commentaire = values.commentaire
+            ? values.commentaire + " | " + seg
+            : seg;
+      });
+      if (ok.length) values[key] = ok.join(" | ");
+      else delete values[key];
+    });
+    if (values.cotisation && /\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}/.test(String(values.cotisation)) &&
+        !(root.SEC && root.SEC.Normalizers && root.SEC.Normalizers.looksLikeAmount(values.cotisation))) {
+      values.commentaire = values.commentaire
+        ? values.commentaire + " | " + values.cotisation
+        : values.cotisation;
+      delete values.cotisation;
+    }
     if (Object.keys(values).length) rows[Math.floor(i)] = values;
   });
   return { rows: rows, invalid: invalid };

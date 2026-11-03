@@ -419,7 +419,7 @@
       /* Already answered earlier in this session (any file): reuse it.
        * A FIXED model chosen by the user must answer with THAT model, so only
        * automatic mode reuses answers produced by another model. */
-      var cacheKey = (state.model || "auto") + "|" + k;
+      var cacheKey = (state.model || "auto") + "|" + String(fileName || "") + "|" + k;
       if (cache.has(cacheKey)) {
         hints[k] = cache.get(cacheKey);
         return;
@@ -497,7 +497,7 @@
             : String(header || "").toLowerCase();
           var v = res.fullName[header];
           if (!k || !v || (!v.nom && !v.prenom)) return;
-          cacheParts[k] = { nom: String(v.nom || ""), prenom: String(v.prenom || "") };
+          cacheParts[String(fileName || "") + "|" + k] = { nom: String(v.nom || ""), prenom: String(v.prenom || "") };
         });
         /* Every asked header was answered: merge with the cached ones. */
         Object.keys(hints).forEach(function (k) {
@@ -775,8 +775,8 @@
     suggestSheet: suggestSheet,
     isAmbiguous: isAmbiguous,
     /* Name split already computed for this column (any file, this session). */
-    nameParts: function (headerNorm) {
-      return cacheParts[headerNorm] || null;
+    nameParts: function (headerNorm, fileName) {
+      return cacheParts[String(fileName || "") + "|" + headerNorm] || null;
     },
     lastError: function () {
       return state.lastError;

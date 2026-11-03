@@ -613,6 +613,165 @@
       return result;
     }
 
+    /* A destination column keeps only its own TYPE — whatever (human or AI)
+     * wrote the value. Text, dates, reminders and junk never stay in
+     * « Téléphone 1/2 », « Mutuelle », « Cotisation » or « Code postal »: they
+     * move to « Commentaire » (nothing is ever lost). Applied to EVERY row,
+     * idempotent. This is the rule that keeps the export free of misplaced
+     * values whatever the assistant answered. */
+    /* Does this value TYPE-FIT the slot? Used to rescue a value the assistant
+     * left unclassified: the local engine's correct placement survives. */
+    function slotAcceptsValue(key, v) {
+      var t = N.trimClean(v);
+      if (!t) return false;
+      switch (key) {
+        case 'tel1':
+        case 'tel2':
+          return N.looksLikePhone(t) && !(N.isUnusablePhone && N.isUnusablePhone(t));
+        case 'cp':
+          return N.looksLikePostal(t);
+        case 'email':
+          return N.looksLikeEmail(t);
+        case 'cotisation':
+          return N.looksLikeAmount(t);
+        case 'mutuelle':
+          return !!(N.matchInsurer(t) || (N.looksLikeMutuelle && N.looksLikeMutuelle(t)));
+        case 'ville':
+          if (SEC.Communes && SEC.Communes.count()) {
+            var res = SEC.Communes.validate(t, '');
+            if (res.status === 'ok' || res.status === 'corrected') return true;
+          }
+          return !!(N.looksLikeCity && N.looksLikeCity(t) && !N.looksLikePersonName(t));
+        default:
+          return false;
+      }
+    }
+
+    /* Two texts meaning the same value, ignoring accents, case and every
+     * separator: "06 11 00 10 05" and "0611001005" are the SAME phone. */
+    function sameLoose(a, b) {
+      var norm = function (s) {
+        var t = N.stripAccents ? N.stripAccents(String(s == null ? '' : s)) : String(s == null ? '' : s);
+        return t.toLowerCase().replace(/[^a-z0-9]/g, '');
+      };
+      var x = norm(a), y = norm(b);
+      return !!x && x === y;
+    }
+
+    /* Text that is a date in any common French notation. */
+    function isDateLikeText(s) {
+      var t = N.trimClean(s);
+      if (!t || t.length > 40) return false;
+      return /\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}/.test(t) ||
+        /^\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}$/.test(t);
+    }
+    /* Typed destinations and the values they refuse outright — used to vet
+     * what the assistant wrote before it can overwrite the local reading.
+     * These rules are deliberately STRICT about the wrong type and permissive
+     * about the right one (an insurer name that is not in the dictionary is
+     * still accepted as a Mutuelle) so a correct value is never thrown away. */
+    var TYPED_SLOTS = {
+      tel1: function (t) { return !(N.looksLikePhone(t) && !(N.isUnusablePhone && N.isUnusablePhone(t))); },
+      tel2: function (t) { return !(N.looksLikePhone(t) && !(N.isUnusablePhone && N.isUnusablePhone(t))); },
+      cp: function (t) { return !N.looksLikePostal(t); },
+      email: function (t) { return !N.looksLikeEmail(t); },
+      cotisation: function (t) { return isDateLikeText(t) || !N.looksLikeAmount(t); },
+      mutuelle: function (t) {
+        if (isDateLikeText(t) || N.looksLikeAmount(t) || N.looksLikePhone(t)) return true;
+        if (SEC.Communes && SEC.Communes.count && SEC.Communes.count() && SEC.Communes.isKnownCity(t)) return true;
+        return !!(N.looksLikePersonName && N.looksLikePersonName(t) && !(N.isPureInsurer && N.isPureInsurer(t)));
+      },
+      ville: function (t) {
+        if (isDateLikeText(t) || N.looksLikeAmount(t) || N.looksLikePhone(t)) return true;
+        return !!(N.looksLikePersonName && N.looksLikePersonName(t) && !(N.looksLikeCity && N.looksLikeCity(t)));
+      }
+    };
+
+    function enforceDestinationTypes(values) {
+      var pushComment = function (t) {
+        var x = N.trimClean(t);
+        if (!x) return;
+        values.commentaire = values.commentaire ? (values.commentaire + ' | ' + x) : x;
+      };
+      var isDateLike = function (s) {
+        return /\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}/.test(s) ||
+          /^\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}$/.test(s);
+      };
+      /* 1. Téléphone 1/2 = phone numbers ONLY (never text, dates, reminders). */
+      ['tel1', 'tel2'].forEach(function (slot) {
+        if (!values[slot]) return;
+        var segs = String(values[slot]).split(/\s*\|\s*/).filter(Boolean);
+        var keep = [];
+        segs.forEach(function (seg) {
+          if (N.looksLikePhone(seg) && !(N.isUnusablePhone && N.isUnusablePhone(seg))) {
+            var an = N.analyzePhone(seg);
+            keep.push(an.value || seg);
+          } else {
+            pushComment(seg);
+          }
+        });
+        values[slot] = keep.join(' | ');
+      });
+      /* 2. Mutuelle = insurer names only: official name when recognized, an
+       * unknown small mutuelle name is kept, junk (notes, dates, placeholders)
+       * moves to Commentaire. */
+      if (values.mutuelle) {
+        var mSegs = String(values.mutuelle).split(/\s*\|\s*/).filter(Boolean);
+        var mKeep = [];
+        mSegs.forEach(function (seg) {
+          var t = N.trimClean(seg);
+          if (!t) return;
+          var official = N.matchInsurer(t);
+          if (official) { mKeep.push(official); return; }
+          if (N.isPlaceholder && N.isPlaceholder(t)) return;
+          if (/^(autre|aucun(e)?|sans objet|sans|n[\/.]?a[\/.]?|neant|ras|x|-+|\.+)$/i.test(t)) return;
+          if (N.isNoteLike(t) || (N.looksLikeCommentText && N.looksLikeCommentText(t)) ||
+              N.looksLikePhone(t) || N.looksLikeAmount(t) || isDateLike(t)) {
+            pushComment(t);
+            return;
+          }
+          /* Not an insurer name at all: a city ("PARIS") or a person name
+           * must never stay in « Mutuelle » — it moves to Commentaire (an
+           * unknown small mutual is kept, real data is never discarded). */
+          if (SEC.Communes && SEC.Communes.isKnownCity && SEC.Communes.isKnownCity(t)) {
+            pushComment(t);
+            return;
+          }
+          if (N.looksLikePersonName && N.looksLikePersonName(t) &&
+              !(N.looksLikeInsurer && N.looksLikeInsurer(t))) {
+            pushComment(t);
+            return;
+          }
+          mKeep.push(t);
+        });
+        values.mutuelle = mKeep.join(' | ');
+      }
+      /* 3. Cotisation = money only: a date, an age or a reminder never. */
+      if (values.cotisation) {
+        var c = N.trimClean(values.cotisation);
+        var money = N.looksLikeAmount(c);
+        if (!money && (isDateLike(c) || (N.isAmbiguousNumber && N.isAmbiguousNumber(c)) ||
+            (N.looksLikeAge && N.looksLikeAge(c)) || N.isNoteLike(c) || !/\d/.test(c))) {
+          pushComment(c);
+          values.cotisation = '';
+        } else if (!money) {
+          /* A composed value carries an amount ("A· 45,60 €"): keep the
+           * number, never the wrapper. */
+          var numPart = /[.,]\d{2}|\d\s*(?:€|euros?|eur|fcfa|francs?)\b/i.test(c) ? N.extractAmount(c) : '';
+          if (numPart) values.cotisation = numPart;
+          else { pushComment(c); values.cotisation = ''; }
+        }
+      }
+      /* 4. Code postal = never a date or a note. */
+      if (values.cp) {
+        var cp = N.trimClean(values.cp);
+        if (!N.looksLikePostal(cp) && (isDateLike(cp) || (N.isNoteLike && N.isNoteLike(cp)))) {
+          pushComment(cp);
+          values.cp = '';
+        }
+      }
+    }
+
     /* City validation against the official commune database.
      * - identified with certainty -> official INSEE name (accents, spacing)
      * - not identified -> Ville left EMPTY, the raw text is reported
@@ -1005,6 +1164,9 @@
           /* True when Gemini classified this line: the local content checks
            * then only verify / normalise, they never re-classify. */
           var aiPlaced = false;
+          /* Set when the assistant left pieces in « Commentaire »: they are
+           * proposed for validation once the row has been cleaned. */
+          var aiPiecesPending = null;
 
           var problemList = [];   // per-row human-readable problems
 
@@ -1096,33 +1258,72 @@
                  * mis-placed values in the first place). Nothing is lost: a
                  * source word Gemini placed nowhere was already appended to
                  * « Commentaire » above. */
-                SEC.TARGET_KEYS.forEach(function (key) { values[key] = ''; });
+                var localBefore = {};
+                SEC.TARGET_KEYS.forEach(function (key) {
+                  localBefore[key] = values[key];
+                  values[key] = '';
+                });
                 SEC.TARGET_KEYS.forEach(function (key) {
                   if (typeof aiValues[key] === 'string') values[key] = aiValues[key];
                 });
-                aiPlaced = true;
-                /* Everything the AI pushed to « Commentaire » is NOT proven:
-                 * it is proposed for VALIDATION instead of being accepted.
-                 * The value stays visible in Commentaire so no data is lost,
-                 * and the export waits for the user's decision. */
-                if (aiValues.commentaire) {
-                  var recKey = entry.id + '|' + sheet.name + '|' + sourceRowNumAi;
-                  aiValues.commentaire.split(/\s*\|\s*/).forEach(function (piece, pi) {
-                    var val = N.trimClean(piece);
-                    if (!val || N.isPlaceholder && N.isPlaceholder(val)) return;
-                    /* Only a value that COULD belong elsewhere is worth a
-                     * decision: a plain note ("actif", "RAS") stays a note. */
-                    var guess = suggestDestination(val, values);
-                    if (guess === 'commentaire') return;
-                    addManualItem({
-                      recordKey: recKey, field: 'ai' + pi,
-                      fileName: entry.name, sheet: sheet.name, row: sourceRowNumAi,
-                      sourceHeader: '(classe par l IA dans Commentaire)',
-                      value: val, suggestion: guess,
-                      reason: 'l IA n a pas pu identifier cette valeur avec certitude'
-                    });
+                /* A typed destination keeps only its own type, even when the
+                 * assistant wrote it: a text in « Téléphone 1 », a city in
+                 * « Mutuelle » or a date in « Cotisation » is moved back to
+                 * « Commentaire » right away, so the local reading of that
+                 * same slot (rescued just below) is kept instead of being
+                 * dropped. This is what corrupted Téléphone / Mutuelle /
+                 * Cotisation on the rows the assistant got wrong. */
+                SEC.TARGET_KEYS.forEach(function (key) {
+                  if (key === 'commentaire' || !values[key]) return;
+                  if (!TYPED_SLOTS[key]) return;
+                  var segs = String(values[key]).split(/\s*\|\s*/);
+                  var keep = [];
+                  segs.forEach(function (seg) {
+                    var s = N.trimClean(seg);
+                    if (!s) return;
+                    if (!TYPED_SLOTS[key](s)) { keep.push(s); return; }
+                    values.commentaire = values.commentaire ? (values.commentaire + ' | ' + s) : s;
                   });
-                }
+                  values[key] = keep.join(' | ');
+                });
+                /* The assistant answered a LATER sheet-style line and left a
+                 * destination empty (e.g. no city given): the local engine's
+                 * correct placement for that slot is NOT thrown away into
+                 * « Commentaire » — it is kept. A value the assistant
+                 * explicitly moved elsewhere (it is covered by its answer)
+                 * is not rescued: its decision wins. */
+                SEC.TARGET_KEYS.forEach(function (key) {
+                  if (values[key]) return;
+                  var local = N.trimClean(localBefore[key]);
+                  if (!local || local.indexOf('|') !== -1) return;
+                  /* Only a value the assistant EXPLICITLY placed in another
+                   * real column beats the local reading. A value that merely
+                   * fell into « Commentaire » as an unplaced leftover is
+                   * rescued back to its correct column. */
+                  var covered = SEC.TARGET_KEYS.some(function (k2) {
+                    if (k2 === 'commentaire') return false;
+                    return typeof values[k2] === 'string' && values[k2] &&
+                      N.trimClean(values[k2]).indexOf(local) !== -1;
+                  });
+                  if (covered) return;
+                  if (!slotAcceptsValue(key, local)) return;
+                  values[key] = local;
+                  /* the same text was appended to Commentaire as a leftover:
+                   * remove the duplicate (its column now holds it). */
+                  if (values.commentaire) {
+                    values.commentaire = values.commentaire
+                      .split(/\s*\|\s*/)
+                      .filter(function (p) { return !sameLoose(N.trimClean(p), local); })
+                      .join(' | ');
+                  }
+                });
+                aiPlaced = true;
+                /* The « À valider » items are built AFTER the type checks
+                 * (below): the row is first cleaned, so a value the app has
+                 * already placed in its correct column is never proposed for
+                 * validation as well (that flooded the table and blocked the
+                 * export for hundreds of perfectly placed rows). */
+                aiPiecesPending = { row: sourceRowNumAi };
               }
             }
           }
@@ -1134,6 +1335,51 @@
             values.ville = city.value;
             /* An unidentified city is left empty and reported, but the row is
              * still added successfully (nothing is lost or misplaced). */
+          }
+
+          /* 0. Destination columns keep only their own type — whatever
+           * wrote the value (local engine or the assistant). */
+          enforceDestinationTypes(values);
+
+          /* What the assistant could not identify is proposed for validation
+           * ONLY now, from the CLEANED row: a piece that already sits in its
+           * right column (phone, mutuelle, cotisation…) is not uncertain, it
+           * is placed — proposing it again blocked the export for nothing. */
+          if (aiPiecesPending && values.commentaire) {
+            var aiRowNum = aiPiecesPending.row;
+            var aiRecKey = entry.id + '|' + sheet.name + '|' + aiRowNum;
+            var placedPieces = [];
+            SEC.TARGET_KEYS.forEach(function (k3) {
+              if (k3 === 'commentaire' || !values[k3]) return;
+              String(values[k3]).split(/\s*\|\s*/).forEach(function (p) {
+                var t = N.trimClean(p);
+                if (t) placedPieces.push(t);
+              });
+            });
+            values.commentaire.split(/\s*\|\s*/).forEach(function (piece, pi) {
+              var val = N.trimClean(piece);
+              if (!val || (N.isPlaceholder && N.isPlaceholder(val))) return;
+              /* Already in its column (same digits, accents and separators
+               * ignored): nothing to decide. */
+              if (placedPieces.some(function (pv) { return sameLoose(pv, val); })) return;
+              var guess = suggestDestination(val, values);
+              if (guess === 'commentaire') return;
+              /* A phone never contains a word: a note such as
+               * « Rappel 30/04/2024 » holds 10 digits but is not a phone —
+               * proposing « Téléphone » for it flooded the review table and
+               * blocked the export for nothing. */
+              if ((guess === 'tel1' || guess === 'tel2') && /[a-zA-Z\u00c0-\u00ff]/.test(val)) return;
+              /* The suggested column is already filled by another value: not
+               * a decision the user can make either. */
+              if (values[guess]) return;
+              addManualItem({
+                recordKey: aiRecKey, field: 'ai' + pi,
+                fileName: entry.name, sheet: sheet.name, row: aiRowNum,
+                sourceHeader: '(classe par l IA dans Commentaire)',
+                value: val, suggestion: guess,
+                reason: 'l IA n a pas pu identifier cette valeur avec certitude'
+              });
+            });
           }
 
           /* 1. Nom / Prénom hygiene — a person name NEVER contains a note.
@@ -1449,7 +1695,7 @@
             var nameSplit = null;
             var colHeaderNorm = nameColumnNorm || '';
             var aiParts = colHeaderNorm && SEC.AI && SEC.AI.nameParts
-              ? SEC.AI.nameParts(colHeaderNorm)
+              ? SEC.AI.nameParts(colHeaderNorm, entry.name)
               : null;
             if (aiParts && aiParts.nom && aiParts.prenom) {
               var rebuilt = (aiParts.nom + ' ' + aiParts.prenom).replace(/\s+/g, ' ').trim().toLowerCase();
@@ -1785,7 +2031,13 @@
         entry.status = S.COMPLETED;
         entry.stage = 'Termine';
         entry.parsedSheets = null; // release heavy arrays; re-read from File on retry if needed
-        entry._lastBuffer = buffer; // tests / in-session retry without re-reading
+        /* Keep at most ONE raw buffer alive: several large workbooks would
+         * otherwise all sit in memory at once (freeze, corrupted last file).
+         * A reprocess re-reads the File object via readBuffer instead. */
+        session.files.forEach(function (e2) {
+          if (e2 !== entry) e2._lastBuffer = null;
+        });
+        entry._lastBuffer = buffer; // in-session retry without re-reading
         /* Full-sheet statistics: how many lines Gemini really classified, how
          * many it could not (kept by the local engine) and how many answers
          * were truncated and retried. Shown in the report, never hidden. */
@@ -1886,6 +2138,7 @@
             if (entry._bufferPromise) {
               var pending = entry._bufferPromise;
               entry._bufferPromise = null;
+              prefetchFor = null; // consumed: the next file may be prefetched
               return pending;
             }
             if (entry._lastBuffer) return entry._lastBuffer;
