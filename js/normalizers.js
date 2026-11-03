@@ -123,10 +123,11 @@
       return { value: original, valid: false, kind: null, reason: 'prefixe 33 mais longueur invalide' };
     }
 
-    /* French numbering plan only assigns 01-05 (landline), 06-07 (mobile)
-     * and 08-09 (special/voIP). "03" is NOT a valid prefix, so a value like
-     * "03.60.26.08.04" must never be taken for a phone number. */
-    if (/^0[1-9]\d{8}$/.test(digits) && !/^00/.test(digits) && !/^03/.test(digits)) {
+    /* French numbering plan: 01 Île-de-France, 02 North-West, 03 North-East
+     * (03 85 = Saône-et-Loire / Le Creusot), 04 South-East, 05 South-West,
+     * 06-07 mobile, 08 special, 09 VoIP. Every 0X prefix IS valid: rejecting
+     * "03" threw away every landline of a whole region ("0385561532"). */
+    if (/^0[1-9]\d{8}$/.test(digits) && !/^00/.test(digits)) {
       return {
         value: digits,
         valid: true,
